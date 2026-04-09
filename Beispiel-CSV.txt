@@ -1,0 +1,3 @@
+company_name,industry,city,website,email,phone,google_rating,review_count,source
+Praxis Dental Plus,Zahnarzt,Köln,https://example.com,info@example.com,0221123456,4.1,53,maps
+Muster Elektrotechnik,Elektriker,Bielefeld,https://example.org,info@example.org,0521123456,3.8,29,maps
