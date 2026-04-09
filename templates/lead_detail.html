@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="detail-grid">
+  <div class="card">
+    <h1>{{ lead.company_name }}</h1>
+    <p><strong>Branche:</strong> {{ lead.industry or '—' }}</p>
+    <p><strong>Stadt:</strong> {{ lead.city or '—' }}</p>
+    <p><strong>E-Mail:</strong> {{ lead.email or '—' }}</p>
+    <p><strong>Telefon:</strong> {{ lead.phone or '—' }}</p>
+    <p><strong>Website:</strong>
+      {% if lead.website %}
+      <a href="{{ lead.website }}" target="_blank" rel="noopener noreferrer">{{ lead.website }}</a>
+      {% else %}—{% endif %}
+    </p>
+    <p><strong>Bewertung:</strong> {{ lead.google_rating or '—' }}</p>
+    <p><strong>Bewertungen:</strong> {{ lead.review_count or '—' }}</p>
+    <p><strong>Score:</strong> <span class="pill score">{{ lead.score }}</span></p>
+    <p><strong>Status:</strong> <span class="pill">{{ lead.status }}</span></p>
+
+    <form method="post" action="{{ url_for('update_status', lead_id=lead.id) }}" class="stack-form">
+      <label>Status ändern</label>
+      <select name="status">
+        {% for s in ['new', 'qualified', 'contacted', 'replied', 'won', 'lost'] %}
+          <option value="{{ s }}" {% if lead.status == s %}selected{% endif %}>{{ s }}</option>
+        {% endfor %}
+      </select>
+      <button class="btn" type="submit">Speichern</button>
+    </form>
+
+    <form method="post" action="{{ url_for('rerun_audit', lead_id=lead.id) }}">
+      <button class="btn btn-secondary" type="submit">Audit neu ausführen</button>
+    </form>
+  </div>
+
+  <div class="card">
+    <h2>Audit</h2>
+    <p><strong>Titel:</strong> {{ lead.site_title or '—' }}</p>
+    <p><strong>Meta Description:</strong> {{ lead.meta_description or '—' }}</p>
+    <p><strong>H1:</strong> {{ 'Ja' if lead.has_h1 else 'Nein' }}</p>
+    <p><strong>CTA erkannt:</strong> {{ 'Ja' if lead.has_cta else 'Nein' }}</p>
+    <p><strong>Mobile-Signale:</strong> {{ 'Ja' if lead.mobile_signals else 'Nein' }}</p>
+    <p><strong>Kontakt sichtbar:</strong> {{ 'Ja' if lead.has_contact_info else 'Nein' }}</p>
+    <p><strong>Ladezeit:</strong> {{ lead.page_load_ms or '—' }} ms</p>
+
+    <h3>Audit-Notizen</h3>
+    <pre>{{ lead.audit_notes or 'Keine Notizen vorhanden.' }}</pre>
+
+    <h3>Score-Gründe</h3>
+    <pre>{{ lead.score_reasons or 'Keine Gründe vorhanden.' }}</pre>
+  </div>
+</section>
+
+<section class="card">
+  <h2>Outreach-Vorlage</h2>
+  <p><strong>Betreff:</strong> {{ email_tpl.subject }}</p>
+  <pre>{{ email_tpl.body }}</pre>
+</section>
+{% endblock %}

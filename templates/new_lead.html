@@ -1,0 +1,36 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="card narrow">
+  <h1>Neuen Lead anlegen</h1>
+  <form method="post" class="stack-form">
+    <label>Firmenname</label>
+    <input name="company_name" required>
+
+    <label>Branche</label>
+    <input name="industry" placeholder="z. B. Zahnarzt">
+
+    <label>Stadt</label>
+    <input name="city" placeholder="z. B. Köln">
+
+    <label>Website</label>
+    <input name="website" placeholder="https://beispiel.de">
+
+    <label>E-Mail</label>
+    <input name="email" type="email" placeholder="info@beispiel.de">
+
+    <label>Telefon</label>
+    <input name="phone">
+
+    <label>Google Bewertung</label>
+    <input name="google_rating" placeholder="4.1">
+
+    <label>Anzahl Bewertungen</label>
+    <input name="review_count" placeholder="53">
+
+    <label>Quelle</label>
+    <input name="source" placeholder="manual">
+
+    <button class="btn" type="submit">Lead anlegen</button>
+  </form>
+</section>
+{% endblock %}

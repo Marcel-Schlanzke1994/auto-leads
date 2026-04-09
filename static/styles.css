@@ -1,0 +1,74 @@
+:root {
+  color: var(--text);
+  border-color: var(--line);
+}
+
+.pill {
+  display: inline-block;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #20283a;
+  border: 1px solid var(--line);
+}
+
+.score {
+  color: var(--gold);
+  font-weight: 700;
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+.stack-form {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+input, select, button, textarea {
+  font: inherit;
+}
+
+input, select {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: #0f141d;
+  color: var(--text);
+}
+
+pre {
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: #0b1017;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px;
+}
+
+.flash-stack {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.flash {
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+}
+
+.flash.success { border-color: rgba(31, 143, 95, 0.4); background: rgba(31, 143, 95, 0.15); }
+.flash.error { border-color: rgba(181, 71, 71, 0.4); background: rgba(181, 71, 71, 0.15); }
+.narrow { max-width: 760px; }
+
+@media (max-width: 900px) {
+  .stats-grid, .detail-grid {
+    grid-template-columns: 1fr;
+  }
+}

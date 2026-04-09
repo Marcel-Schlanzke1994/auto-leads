@@ -1,0 +1,55 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="hero">
+  <h1>Lead Dashboard</h1>
+  <p>Leads erfassen, auditieren, priorisieren und anschreiben.</p>
+</section>
+
+<section class="stats-grid">
+  <div class="card stat"><strong>{{ stats.total }}</strong><span>Gesamt</span></div>
+  <div class="card stat"><strong>{{ stats.high_score }}</strong><span>High Score (50+)</span></div>
+  <div class="card stat"><strong>{{ stats.contacted }}</strong><span>Kontaktiert</span></div>
+  <div class="card stat"><strong>{{ stats.won }}</strong><span>Gewonnen</span></div>
+</section>
+
+<section class="card">
+  <div class="table-head">
+    <h2>Leads</h2>
+    <a class="btn" href="{{ url_for('new_lead') }}">+ Lead</a>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Firma</th>
+          <th>Branche</th>
+          <th>Stadt</th>
+          <th>Score</th>
+          <th>Status</th>
+          <th>Website</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for lead in leads %}
+        <tr>
+          <td><a href="{{ url_for('lead_detail', lead_id=lead.id) }}">{{ lead.company_name }}</a></td>
+          <td>{{ lead.industry or '—' }}</td>
+          <td>{{ lead.city or '—' }}</td>
+          <td><span class="pill score">{{ lead.score }}</span></td>
+          <td><span class="pill">{{ lead.status }}</span></td>
+          <td>
+            {% if lead.website %}
+              <a href="{{ lead.website }}" target="_blank" rel="noopener noreferrer">öffnen</a>
+            {% else %}
+              —
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6">Noch keine Leads vorhanden.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

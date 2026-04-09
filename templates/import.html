@@ -1,0 +1,11 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="card narrow">
+  <h1>CSV-Import</h1>
+  <p>Erwartete Spalten: <code>company_name</code>, <code>industry</code>, <code>city</code>, <code>website</code>, <code>email</code>, <code>phone</code>, <code>google_rating</code>, <code>review_count</code>, <code>source</code></p>
+  <form method="post" enctype="multipart/form-data" class="stack-form">
+    <input type="file" name="file" accept=".csv" required>
+    <button class="btn" type="submit">Import starten</button>
+  </form>
+</section>
+{% endblock %}
