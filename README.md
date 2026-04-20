@@ -1,10 +1,11 @@
 # Auto-Leads (lokales Flask Lead-Tool)
 
-Ein lokales Browser-Tool für Lead-Generierung und Lead-Management mit offizieller **Google Places API (New)**, Website-Audit (inkl. Impressumserkennung), Dublettenfilter, Lead-Scoring, Dashboard und CSV-Export.
+Ein lokales Browser-Tool für Lead-Generierung und Lead-Management mit **kostenfreiem OpenStreetMap/Nominatim-Provider (Default)** oder optional offizieller Google Places API (New), Website-Audit (inkl. Impressumserkennung), Dublettenfilter, Lead-Scoring, Dashboard und CSV-Export.
 
 ## Features
 
-- Google Places Text Search + Place Details (offizielle API, kein HTML-Scraping)
+- Kostenfreie OSM/Nominatim-Suche als Default (kein API-Key erforderlich)
+- Optional Google Places Text Search + Place Details (offizielle API, kostenpflichtig je nach Usage)
 - Mehrfachsuche für Städte (`Köln, Bonn, Leverkusen`)
 - Lokale SQLite-Datenbank
 - Dublettenfilter über Domain, Firmenname, Telefonnummer, E-Mail, Place-ID
@@ -32,6 +33,7 @@ Ein lokales Browser-Tool für Lead-Generierung und Lead-Management mit offiziell
 │   ├── services/
 │   │   ├── audit.py
 │   │   ├── dedupe.py
+│   │   ├── free_places.py
 │   │   ├── google_places.py
 │   │   ├── scoring.py
 │   │   └── search_runner.py
@@ -45,8 +47,8 @@ Ein lokales Browser-Tool für Lead-Generierung und Lead-Management mit offiziell
 ## Voraussetzungen
 
 - Python 3.11+
-- Google Cloud Projekt mit aktivierter **Places API (New)**
-- Ein API-Key mit passender Abrechnung/Quota
+- Für den kostenlosen Standardbetrieb sind keine API-Keys nötig
+- Optional: Google Cloud Projekt + Places API (New) + API-Key für den Google-Modus
 
 ## Setup
 
@@ -57,9 +59,16 @@ pip install -r requirements.txt
 cp .env.example .env
 ```
 
-API-Key in `.env` eintragen:
+Für 100% kostenlosen Betrieb reicht:
 
 ```env
+PLACES_PROVIDER=osm
+```
+
+Optional (Google-Modus):
+
+```env
+PLACES_PROVIDER=google_places
 GOOGLE_MAPS_API_KEY=dein_key
 ```
 
@@ -89,20 +98,18 @@ Dann im Browser öffnen: `http://127.0.0.1:5000`
 
 ## Sicherheit
 
-- API-Key nur über `.env`
+- Standardmäßig kein externer API-Key nötig (OSM-Modus)
+- Google-API-Key nur über `.env` (falls Google-Modus aktiviert)
 - CSRF über Flask-WTF
 - Rate Limits über Flask-Limiter
 - HTTP Timeouts für externe Requests
 - SSRF-Schutz: blockiert `localhost`, `127.0.0.1`, private IP-Bereiche, `.local`
 - externe Links mit `rel="noopener noreferrer"`
 
-## Google Places Kosten-/Quota-Hinweis
+## Kostenhinweis
 
-Google Places API ist kostenpflichtig nach Usage/Quota. Prüfe in der Google Cloud Console:
-
-- aktivierte APIs
-- Limits (QPS / Tageslimit)
-- Billing Budget & Alerts
+- **Default (`PLACES_PROVIDER=osm`)**: kostenfrei über OpenStreetMap/Nominatim (bitte faire Nutzung/Rate-Limits beachten).
+- **Optional (`PLACES_PROVIDER=google_places`)**: Google Places API ist kostenpflichtig nach Usage/Quota.
 
 ## Tests & Qualitätschecks
 
