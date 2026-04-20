@@ -11,40 +11,63 @@
 </section>
 
 {% if latest_job %}
-<section class="panel">
+<section class="panel" id="job-panel" data-job-id="{{ latest_job.id }}" data-job-status="{{ latest_job.status }}">
   <h2>Letzter Suchjob #{{ latest_job.id }}</h2>
-  <p>Status: <span class="pill {{ latest_job.status }}">{{ latest_job.status }}</span></p>
-  <p>{{ latest_job.message }}</p>
-  <div class="progress"><div class="progress-bar" style="width: {{ (latest_job.processed / latest_job.total * 100) if latest_job.total else 0 }}%"></div></div>
-  <small>{{ latest_job.processed }} / {{ latest_job.total }} verarbeitet · {{ latest_job.created }} erstellt · {{ latest_job.skipped_duplicates }} Dubletten</small>
+  <p>Status: <span id="job-status" class="pill {{ latest_job.status }}">{{ latest_job.status }}</span></p>
+  <p id="job-message">{{ latest_job.message }}</p>
+  {% set progress = (latest_job.processed / latest_job.total * 100) if latest_job.total else 0 %}
+  <div class="progress"><div id="job-progress-bar" class="progress-bar" style="width: {{ progress }}%"></div></div>
+  <small id="job-meta">{{ latest_job.processed }} / {{ latest_job.total }} verarbeitet · {{ latest_job.created }} erstellt · {{ latest_job.skipped_duplicates }} Dubletten · {{ latest_job.errors }} Fehler</small>
 </section>
 {% endif %}
 
 <section class="panel">
-  <h2>Leadliste</h2>
-  <table>
-    <thead>
-      <tr>
-        <th>Firma</th><th>Stadt</th><th>Website</th><th>E-Mail</th><th>Telefon</th><th>Rating</th><th>Reviews</th><th>Score</th><th>Status</th>
-      </tr>
-    </thead>
-    <tbody>
-    {% for lead in leads %}
-      <tr>
-        <td><a href="{{ url_for('web.lead_detail', lead_id=lead.id) }}">{{ lead.company_name }}</a></td>
-        <td>{{ lead.city or '-' }}</td>
-        <td>{% if lead.website %}<a href="{{ lead.website }}" target="_blank" rel="noopener noreferrer">{{ lead.website }}</a>{% else %}-{% endif %}</td>
-        <td>{{ lead.email or '-' }}</td>
-        <td>{{ lead.phone or '-' }}</td>
-        <td>{{ lead.google_rating or '-' }}</td>
-        <td>{{ lead.review_count or '-' }}</td>
-        <td><span class="score">{{ lead.score }}</span></td>
-        <td><span class="pill {{ lead.status }}">{{ lead.status }}</span></td>
-      </tr>
-    {% else %}
-      <tr><td colspan="9">Keine Leads vorhanden.</td></tr>
-    {% endfor %}
-    </tbody>
-  </table>
+  <div class="toolbar">
+    <h2>Leadliste</h2>
+    <input id="lead-filter" type="search" placeholder="Nach Firma, Stadt, E-Mail, Telefon suchen..." />
+  </div>
+  <div class="table-wrap">
+    <table id="lead-table">
+      <thead>
+        <tr>
+          <th>Firma</th>
+          <th>Stadt</th>
+          <th>Adresse</th>
+          <th>Website</th>
+          <th>E-Mail</th>
+          <th>Telefon</th>
+          <th>Inhaber/GF</th>
+          <th>Rating</th>
+          <th>Reviews</th>
+          <th>Score</th>
+          <th>Status</th>
+          <th>Quelle</th>
+          <th>Erstellt</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for lead in leads %}
+        <tr>
+          <td><a href="{{ url_for('web.lead_detail', lead_id=lead.id) }}">{{ lead.company_name }}</a></td>
+          <td>{{ lead.city or '-' }}</td>
+          <td>{{ lead.address or '-' }}</td>
+          <td>{% if lead.website %}<a href="{{ lead.website }}" target="_blank" rel="noopener noreferrer">{{ lead.website }}</a>{% else %}-{% endif %}</td>
+          <td>{{ lead.email or '-' }}</td>
+          <td>{{ lead.phone or '-' }}</td>
+          <td>{{ lead.owner_name or '-' }}</td>
+          <td>{{ lead.google_rating or '-' }}</td>
+          <td>{{ lead.review_count or '-' }}</td>
+          <td><span class="score">{{ lead.score }}</span></td>
+          <td><span class="pill {{ lead.status }}">{{ lead.status }}</span></td>
+          <td>{{ lead.source }}</td>
+          <td>{{ lead.created_at.strftime('%Y-%m-%d %H:%M') if lead.created_at else '-' }}</td>
+        </tr>
+      {% else %}
+        <tr><td colspan="13">Keine Leads vorhanden.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
 </section>
+<script src="{{ url_for('static', filename='dashboard.js') }}"></script>
 {% endblock %}

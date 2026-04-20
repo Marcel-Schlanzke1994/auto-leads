@@ -40,3 +40,7 @@ input, select, button { width: 100%; background: #0e172b; color: var(--text); bo
 .split { display: flex; gap: 1rem; }
 pre { white-space: pre-wrap; background: #0b1222; border: 1px solid #293a5e; padding: .7rem; border-radius: 8px; }
 @media (max-width: 800px){ .split{ flex-direction: column; } }
+
+.toolbar { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: .8rem; }
+.toolbar input[type="search"] { max-width: 420px; }
+.table-wrap { overflow-x: auto; }
