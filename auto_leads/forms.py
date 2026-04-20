@@ -1,12 +1,14 @@
 from flask_wtf import FlaskForm
-from wtforms import SelectField, StringField, SubmitField
-from wtforms.validators import DataRequired, Length
+from wtforms import IntegerField, SelectField, StringField, SubmitField
+from wtforms.validators import DataRequired, Length, NumberRange
 
 
 class SearchForm(FlaskForm):
     keyword = StringField("Suchbegriff", validators=[DataRequired(), Length(max=120)])
     cities = StringField("Städte", validators=[DataRequired(), Length(max=500)])
-    radius = StringField("Radius (optional)")
+    target_count = IntegerField(
+        "Zielanzahl", default=1000, validators=[NumberRange(min=1, max=1000)]
+    )
     submit = SubmitField("Suche starten")
 
 

@@ -96,11 +96,15 @@ class SearchJob(db.Model):
     keyword = db.Column(db.String(200), nullable=False)
     cities = db.Column(db.String(500), nullable=False)
     status = db.Column(db.String(20), nullable=False, default="queued")
-    total = db.Column(db.Integer, nullable=False, default=0)
-    processed = db.Column(db.Integer, nullable=False, default=0)
-    created = db.Column(db.Integer, nullable=False, default=0)
-    skipped_duplicates = db.Column(db.Integer, nullable=False, default=0)
+    target_count = db.Column(db.Integer, nullable=False, default=1000)
+    total_found_raw = db.Column(db.Integer, nullable=False, default=0)
+    total_processed = db.Column(db.Integer, nullable=False, default=0)
+    total_created = db.Column(db.Integer, nullable=False, default=0)
+    duplicates_skipped = db.Column(db.Integer, nullable=False, default=0)
+    filtered_out = db.Column(db.Integer, nullable=False, default=0)
     errors = db.Column(db.Integer, nullable=False, default=0)
+    current_city = db.Column(db.String(120))
+    current_query = db.Column(db.String(255))
     message = db.Column(db.String(500), nullable=False, default="")
     started_at = db.Column(
         db.DateTime(timezone=True), default=lambda: datetime.now(UTC)
@@ -113,11 +117,15 @@ class SearchJob(db.Model):
             "keyword": self.keyword,
             "cities": self.cities,
             "status": self.status,
-            "total": self.total,
-            "processed": self.processed,
-            "created": self.created,
-            "skipped_duplicates": self.skipped_duplicates,
+            "target_count": self.target_count,
+            "total_found_raw": self.total_found_raw,
+            "total_processed": self.total_processed,
+            "total_created": self.total_created,
+            "duplicates_skipped": self.duplicates_skipped,
+            "filtered_out": self.filtered_out,
             "errors": self.errors,
+            "current_city": self.current_city,
+            "current_query": self.current_query,
             "message": self.message,
             "started_at": self.started_at.isoformat() if self.started_at else None,
             "finished_at": self.finished_at.isoformat() if self.finished_at else None,

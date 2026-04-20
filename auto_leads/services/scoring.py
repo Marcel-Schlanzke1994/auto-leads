@@ -19,21 +19,27 @@ def calculate_lead_score(lead: Lead) -> tuple[int, list[str]]:
         reasons.append("Google-Rating fehlt +7")
     elif lead.google_rating < 4.2:
         score += 12
-        reasons.append("Rating unter 4.2 +12")
+        reasons.append("Google-Sternebewertung niedrig (<4.2) +12")
 
     if not lead.website:
         score += 20
-        reasons.append("Keine Website +20")
-    if lead.website and not lead.impressum_found:
-        score += 14
-        reasons.append("Impressum nicht gefunden +14")
+        reasons.append("Website fehlt +20")
+    else:
+        reasons.append("Website vorhanden +0")
 
     if not lead.email:
         score += 8
-        reasons.append("Keine E-Mail +8")
+        reasons.append("E-Mail fehlt +8")
+
     if not lead.phone:
         score += 8
         reasons.append("Keine Telefonnummer +8")
+
+    if lead.website and not lead.impressum_found:
+        score += 14
+        reasons.append("Impressum nicht gefunden +14")
+    elif lead.impressum_found:
+        reasons.append("Impressum gefunden +0")
 
     if not lead.meta_description:
         score += 5
@@ -47,6 +53,6 @@ def calculate_lead_score(lead: Lead) -> tuple[int, list[str]]:
 
     if lead.page_load_ms and lead.page_load_ms > 2500:
         score += 7
-        reasons.append("Langsame Seite (>2.5s) +7")
+        reasons.append("Langsame Website (>2.5s) +7")
 
     return min(score, 100), reasons

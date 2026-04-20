@@ -3,12 +3,23 @@ from types import SimpleNamespace
 from auto_leads.extensions import db
 from auto_leads.models import Lead, SearchJob
 from auto_leads.services.dedupe import is_duplicate_candidate
+from auto_leads.services.scoring import calculate_lead_score
+from auto_leads.services.search_runner import (
+    _create_places_client,
+    _extract_city,
+    _run_search_job,
+)
 from auto_leads.utils import (
     is_private_hostname,
     normalize_website_url,
     parse_float,
     parse_int,
 )
+
+
+def test_env_driven_config(app):
+    assert app.config["PLACES_PROVIDER"] == "google_places"
+    assert app.config["REQUEST_TIMEOUT"] == 8.0
 
 
 def test_url_normalization():
@@ -36,7 +47,7 @@ def test_duplicate_filter(app):
                 company_name="Muster GmbH",
                 source_query="x",
                 website="https://firma.de",
-                phone="+491234",
+                phone="+49 1234",
                 email="x@firma.de",
                 google_place_id="abc",
             )
@@ -57,18 +68,83 @@ def test_duplicate_filter(app):
             phone=None,
             email=None,
         )
+        assert is_duplicate_candidate(
+            place_id=None,
+            company_name="MUSTER GMBH",
+            website=None,
+            phone=None,
+            email=None,
+        )
+        assert is_duplicate_candidate(
+            place_id=None,
+            company_name="neu name",
+            website=None,
+            phone="+491234",
+            email=None,
+        )
+
+
+def test_city_extraction_prefers_structured_components():
+    city = _extract_city(
+        [
+            {"types": ["postal_code"], "longText": "50667"},
+            {"types": ["locality"], "longText": "Köln"},
+        ],
+        "Domkloster 4, 50667 Köln, Deutschland",
+    )
+    assert city == "Köln"
+
+
+def test_city_extraction_fallback_avoids_postal_code():
+    city = _extract_city([], "Musterstraße 1, 50667 Köln, Deutschland")
+    assert city == "Köln"
+
+
+def test_score_calculation_contains_reasons(app):
+    with app.app_context():
+        lead = Lead(company_name="Score GmbH", source_query="q")
+        score, reasons = calculate_lead_score(lead)
+    assert score > 0
+    assert any("Wenig Reviews" in item for item in reasons)
 
 
 def test_lead_creation_and_dashboard(client, app):
     with app.app_context():
         db.session.add(
-            Lead(company_name="Test GmbH", source_query="roof cologne", score=42)
+            Lead(
+                company_name="Test GmbH",
+                source_query="roof cologne",
+                score=42,
+                google_rating=3.9,
+                review_count=12,
+            )
         )
         db.session.commit()
 
     resp = client.get("/")
     assert resp.status_code == 200
-    assert "Test GmbH" in resp.get_data(as_text=True)
+    body = resp.get_data(as_text=True)
+    assert "Test GmbH" in body
+    assert "Mit Google Rating" in body
+
+
+def test_lead_detail_shows_rating_and_reviews(client, app):
+    with app.app_context():
+        lead = Lead(
+            company_name="Detail GmbH",
+            source_query="x",
+            google_rating=4.5,
+            review_count=91,
+        )
+        db.session.add(lead)
+        db.session.commit()
+        lead_id = lead.id
+
+    resp = client.get(f"/lead/{lead_id}")
+    assert resp.status_code == 200
+    text = resp.get_data(as_text=True)
+    assert "Google Sterne" in text
+    assert "91" in text
 
 
 def test_api_endpoints(client, app):
@@ -80,8 +156,9 @@ def test_api_endpoints(client, app):
                 keyword="Dachdecker",
                 cities="Köln",
                 status="running",
-                total=10,
-                processed=1,
+                target_count=1000,
+                total_found_raw=10,
+                total_processed=1,
             )
         )
         db.session.commit()
@@ -96,20 +173,25 @@ def test_api_endpoints(client, app):
 
     progress_resp = client.get("/api/search/progress")
     assert progress_resp.status_code == 200
-    assert "status" in progress_resp.get_json()
+    payload = progress_resp.get_json()
+    assert "status" in payload
+    assert "total_found_raw" in payload
 
 
-def test_api_search_start(client, app, monkeypatch):
-    def fake_start_search_job(flask_app, keyword, cities, radius=None):
+def test_api_search_start_with_target_count(client, app, monkeypatch):
+    def fake_start_search_job(
+        flask_app, keyword, cities, target_count=1000, radius=None
+    ):
         assert flask_app is app
         assert keyword == "Elektriker"
         assert cities == ["Köln", "Bonn"]
+        assert target_count == 777
         return SimpleNamespace(id=123, status="queued")
 
     monkeypatch.setattr("auto_leads.routes.api.start_search_job", fake_start_search_job)
     response = client.post(
         "/api/search/start",
-        json={"keyword": "Elektriker", "cities": "Köln, Bonn"},
+        json={"keyword": "Elektriker", "cities": "Köln, Bonn", "target_count": 777},
     )
 
     assert response.status_code == 202
@@ -118,32 +200,28 @@ def test_api_search_start(client, app, monkeypatch):
     assert payload["status"] == "queued"
 
 
-def test_csv_export(client, app):
+def test_csv_export_contains_new_fields(client, app):
     with app.app_context():
-        db.session.add(Lead(company_name="CSV GmbH", source_query="q"))
+        db.session.add(
+            Lead(
+                company_name="CSV GmbH",
+                source_query="q",
+                google_rating=4.1,
+                review_count=5,
+                score_reasons="A\nB",
+            )
+        )
         db.session.commit()
 
     resp = client.get("/export/csv")
     assert resp.status_code == 200
     text = resp.get_data(as_text=True)
-    assert "company_name" in text
-    assert "CSV GmbH" in text
-
-
-def test_places_provider_defaults_to_osm(app):
-    from auto_leads.services.search_runner import _create_places_client
-
-    with app.app_context():
-        client, source, error = _create_places_client(app)
-
-    assert client is not None
-    assert source == "osm_nominatim"
-    assert error is None
+    assert "google_rating" in text
+    assert "review_count" in text
+    assert "score_reasons" in text
 
 
 def test_google_provider_requires_api_key(app):
-    from auto_leads.services.search_runner import _create_places_client
-
     app.config.update(PLACES_PROVIDER="google_places", GOOGLE_MAPS_API_KEY="")
 
     with app.app_context():
@@ -152,3 +230,79 @@ def test_google_provider_requires_api_key(app):
     assert client is None
     assert source == "google_places"
     assert error == "GOOGLE_MAPS_API_KEY fehlt"
+
+
+def test_google_provider_is_activated(app):
+    app.config.update(PLACES_PROVIDER="google_places", GOOGLE_MAPS_API_KEY="abc")
+
+    with app.app_context():
+        client, source, error = _create_places_client(app)
+
+    assert client is not None
+    assert source == "google_places"
+    assert error is None
+
+
+def test_search_job_reaches_target_and_paginates(app, monkeypatch):
+    with app.app_context():
+        job = SearchJob(keyword="Dachdecker", cities="Köln", target_count=3)
+        db.session.add(job)
+        db.session.commit()
+        job_id = job.id
+
+    class FakePlace:
+        def __init__(self, idx: int):
+            self.place_id = f"p{idx}"
+            self.display_name = f"Firma {idx}"
+            self.formatted_address = f"Straße {idx}, Köln, Deutschland"
+            self.address_components = [{"types": ["locality"], "longText": "Köln"}]
+            self.website = f"https://firma{idx}.de"
+            self.phone = f"+49 100{idx}"
+            self.rating = 4.0
+            self.review_count = 10
+            self.primary_type = "roofing_contractor"
+            self.all_types = ["roofing_contractor", "establishment"]
+
+    class FakeClient:
+        def text_search_paginated(self, query, max_results, safety_page_limit):
+            return SimpleNamespace(
+                place_ids=["p1", "p2", "p3", "p4"], total_found_raw=4
+            )
+
+        def place_details(self, place_id):
+            idx = int(place_id.replace("p", ""))
+            return FakePlace(idx)
+
+    monkeypatch.setattr(
+        "auto_leads.services.search_runner._create_places_client",
+        lambda _app: (FakeClient(), "google_places", None),
+    )
+    monkeypatch.setattr(
+        "auto_leads.services.search_runner.audit_website",
+        lambda website, timeout: SimpleNamespace(
+            site_title="T",
+            meta_description="D",
+            has_h1=True,
+            has_cta=True,
+            mobile_signals=True,
+            has_contact_info=True,
+            page_load_ms=100,
+            impressum_found=True,
+            audit_notes="ok",
+            parser_notes="ok",
+            checked_pages="/",
+            email="x@example.com",
+            phone=None,
+            owner_name="Owner",
+            legal_form="GmbH",
+        ),
+    )
+
+    _run_search_job(app, job_id, "Dachdecker", ["Köln"])
+
+    with app.app_context():
+        updated = db.session.get(SearchJob, job_id)
+        assert updated.status == "finished"
+        assert updated.total_created == 3
+        assert updated.total_found_raw == 4
+        assert Lead.query.count() == 3

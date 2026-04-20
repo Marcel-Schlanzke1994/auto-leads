@@ -44,14 +44,19 @@
         messageNode.textContent = data.message || "";
       }
 
-      const total = data.total || 0;
-      const processed = data.processed || 0;
-      const progress = total > 0 ? Math.round((processed / total) * 100) : 0;
+      const targetCount = data.target_count || 0;
+      const created = data.total_created || 0;
+      const progress =
+        targetCount > 0 ? Math.min(100, Math.round((created / targetCount) * 100)) : 0;
       if (barNode) {
         barNode.style.width = `${progress}%`;
       }
       if (metaNode) {
-        metaNode.textContent = `${processed} / ${total} verarbeitet · ${data.created || 0} erstellt · ${data.skipped_duplicates || 0} Dubletten · ${data.errors || 0} Fehler`;
+        metaNode.textContent =
+          `Ziel ${created} / ${targetCount} neue Leads · Roh ${data.total_found_raw || 0} · ` +
+          `Verarbeitet ${data.total_processed || 0} · Dubletten ${data.duplicates_skipped || 0} · ` +
+          `Gefiltert ${data.filtered_out || 0} · Fehler ${data.errors || 0} · ` +
+          `Stadt ${data.current_city || "-"} · Query ${data.current_query || "-"}`;
       }
 
       if (["finished", "failed"].includes((data.status || "").toLowerCase())) {

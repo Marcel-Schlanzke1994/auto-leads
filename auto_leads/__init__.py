@@ -20,14 +20,15 @@ def create_app(test_config: dict | None = None) -> Flask:
         static_folder="../static",
     )
 
-    db_uri = os.getenv("DATABASE_URL", "sqlite:///leads.db")
     app.config.update(
-        SECRET_KEY=os.getenv("SECRET_KEY", "dev-secret-change-me"),
-        SQLALCHEMY_DATABASE_URI=db_uri,
+        SECRET_KEY=os.getenv("SECRET_KEY", "replace-with-a-long-random-secret"),
+        SQLALCHEMY_DATABASE_URI=os.getenv("DATABASE_URL", "sqlite:///leads.db"),
         SQLALCHEMY_TRACK_MODIFICATIONS=False,
         REQUEST_TIMEOUT=float(os.getenv("REQUEST_TIMEOUT", "8")),
         GOOGLE_MAPS_API_KEY=os.getenv("GOOGLE_MAPS_API_KEY", ""),
-        PLACES_PROVIDER=os.getenv("PLACES_PROVIDER", "osm").lower(),
+        PLACES_PROVIDER=os.getenv("PLACES_PROVIDER", "google_places").lower(),
+        APP_HOST=os.getenv("APP_HOST", "127.0.0.1"),
+        APP_PORT=int(os.getenv("APP_PORT", "5000")),
         MAX_CONTENT_LENGTH=4 * 1024 * 1024,
     )
 
