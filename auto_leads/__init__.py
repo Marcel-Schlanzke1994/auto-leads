@@ -27,6 +27,7 @@ def create_app(test_config: dict | None = None) -> Flask:
         SQLALCHEMY_TRACK_MODIFICATIONS=False,
         REQUEST_TIMEOUT=float(os.getenv("REQUEST_TIMEOUT", "8")),
         GOOGLE_MAPS_API_KEY=os.getenv("GOOGLE_MAPS_API_KEY", ""),
+        PLACES_PROVIDER=os.getenv("PLACES_PROVIDER", "osm").lower(),
         MAX_CONTENT_LENGTH=4 * 1024 * 1024,
     )
 

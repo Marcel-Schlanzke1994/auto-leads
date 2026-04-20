@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from threading import Thread
+from typing import Any
 
 from flask import Flask
 
@@ -9,6 +10,7 @@ from auto_leads.extensions import db
 from auto_leads.models import Lead, SearchJob
 from auto_leads.services.audit import audit_website
 from auto_leads.services.dedupe import is_duplicate_candidate
+from auto_leads.services.free_places import FreePlacesError, OpenStreetMapPlacesClient
 from auto_leads.services.google_places import GooglePlacesClient, GooglePlacesError
 from auto_leads.services.scoring import calculate_lead_score
 from auto_leads.utils import normalize_website_url
@@ -33,23 +35,25 @@ def start_search_job(
 def _run_search_job(
     app: Flask, job_id: int, keyword: str, cities: list[str], radius: int | None
 ) -> None:
+    del radius  # Radius ist für Google Places möglich; OSM ignoriert es aktuell.
+
     with app.app_context():
         job = db.session.get(SearchJob, job_id)
         if not job:
             return
-        job.status = "running"
-        job.message = "Google Places Suche läuft"
-        db.session.commit()
 
-        api_key = app.config.get("GOOGLE_MAPS_API_KEY")
-        if not api_key:
+        client, source_name, provider_error = _create_places_client(app)
+        if not client:
             job.status = "failed"
-            job.message = "GOOGLE_MAPS_API_KEY fehlt"
+            job.message = provider_error or "Places Provider nicht verfügbar"
             job.finished_at = datetime.now(UTC)
             db.session.commit()
             return
 
-        client = GooglePlacesClient(api_key, timeout=app.config["REQUEST_TIMEOUT"])
+        job.status = "running"
+        job.message = f"{source_name} Suche läuft"
+        db.session.commit()
+
         queries = [f"{keyword} {city}" for city in cities]
         place_ids: list[tuple[str, str]] = []
 
@@ -57,7 +61,7 @@ def _run_search_job(
             try:
                 ids = client.text_search(q, max_results=20)
                 place_ids.extend((q, pid) for pid in ids)
-            except GooglePlacesError:
+            except (GooglePlacesError, FreePlacesError):
                 job.errors += 1
 
         job.total = len(place_ids)
@@ -91,7 +95,7 @@ def _run_search_job(
                     google_place_id=place.place_id,
                     google_rating=place.rating,
                     review_count=place.review_count,
-                    source="google_places",
+                    source=source_name,
                     source_query=query,
                     categories=place.primary_type,
                     status="new",
@@ -140,6 +144,26 @@ def _run_search_job(
         job.finished_at = datetime.now(UTC)
         job.message = "Suche abgeschlossen"
         db.session.commit()
+
+
+def _create_places_client(app: Flask) -> tuple[Any | None, str, str | None]:
+    provider = (app.config.get("PLACES_PROVIDER") or "osm").lower().strip()
+
+    if provider == "google_places":
+        api_key = app.config.get("GOOGLE_MAPS_API_KEY")
+        if not api_key:
+            return None, "google_places", "GOOGLE_MAPS_API_KEY fehlt"
+        return (
+            GooglePlacesClient(api_key, timeout=app.config["REQUEST_TIMEOUT"]),
+            provider,
+            None,
+        )
+
+    return (
+        OpenStreetMapPlacesClient(timeout=app.config["REQUEST_TIMEOUT"]),
+        "osm_nominatim",
+        None,
+    )
 
 
 def _extract_city(address: str) -> str | None:

@@ -128,3 +128,27 @@ def test_csv_export(client, app):
     text = resp.get_data(as_text=True)
     assert "company_name" in text
     assert "CSV GmbH" in text
+
+
+def test_places_provider_defaults_to_osm(app):
+    from auto_leads.services.search_runner import _create_places_client
+
+    with app.app_context():
+        client, source, error = _create_places_client(app)
+
+    assert client is not None
+    assert source == "osm_nominatim"
+    assert error is None
+
+
+def test_google_provider_requires_api_key(app):
+    from auto_leads.services.search_runner import _create_places_client
+
+    app.config.update(PLACES_PROVIDER="google_places", GOOGLE_MAPS_API_KEY="")
+
+    with app.app_context():
+        client, source, error = _create_places_client(app)
+
+    assert client is None
+    assert source == "google_places"
+    assert error == "GOOGLE_MAPS_API_KEY fehlt"

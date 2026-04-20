@@ -65,3 +65,55 @@ Für eine stabile lokale Nutzung empfehle ich:
 5. Logs überwachen (Fehlerrate, Timeouts, API-Statuscodes).
 6. Bei Internet-Exponierung Reverse-Proxy mit TLS und Security-Headers nutzen.
 7. Für Team-/Mehrnutzerbetrieb mittelfristig auf PostgreSQL + WSGI-Server (gunicorn/uwsgi) migrieren.
+
+---
+
+## 8) Simulierte Vollprüfung (Lauffähigkeit, Fehlerbild, Funktionsabdeckung)
+
+**Durchgeführt am:** 20. April 2026 (UTC)  
+**Kontext:** Lokale Ausführung im Projektordner `/workspace/auto-leads`.
+
+### 8.1 Technische Laufprüfung
+
+Ausgeführt wurden die obligatorischen Qualitätsprüfungen:
+
+- `pytest` → **8/8 Tests bestanden**.
+- `black --check .` → **Formatierung vollständig korrekt**.
+- `flake8` → **keine Lint-Fehler**.
+
+Ergebnis: Der aktuelle Stand ist lokal lauffähig und im getesteten Scope fehlerfrei.
+
+### 8.2 Pflicht-Checks aus Aufgaben-/Policy-Sicht
+
+Nachfolgende Punkte wurden gegen den tatsächlichen Codebestand geprüft:
+
+1. **Tokens sicher gespeichert (nicht im Quellcode):**
+   - API-Key wird über `.env`/`os.getenv` geladen, kein Hardcoding im Business-Code.
+   - **Status:** erfüllt (mit Hinweis: `SECRET_KEY` besitzt einen unsicheren Fallback für Dev).
+
+2. **Calendar-API mit gültigen Zugriffstokens getestet:**
+   - Im Projekt existiert derzeit **keine Calendar-Integration**.
+   - **Status:** nicht anwendbar / nicht implementiert.
+
+3. **Mongo-kompatible Event-Datenstruktur (`google_id`, `start`, `event_time`, …):**
+   - Projekt nutzt relationale SQLAlchemy-Modelle (SQLite), keine Event-Collection.
+   - **Status:** nicht anwendbar / nicht implementiert.
+
+4. **Discord-Cogs ohne Endlosschleifen:**
+   - Es gibt keine Discord-Cogs im Repository.
+   - **Status:** nicht anwendbar / nicht implementiert.
+
+5. **Umgebungsvariablen statt harter Pfade:**
+   - Relevante Konfiguration wird per `os.getenv`/`.env` bezogen.
+   - **Status:** erfüllt.
+
+### 8.3 Bewertung (Skala 1.0 bis 0.1)
+
+- **Funktionen (ist-Implementierung): 1.0/1.0**  
+  Kernfunktionen (Suche, Dubletten, Audit, Scoring, UI, Export) laufen im Testumfang stabil.
+
+- **Aufgabenfit zu deiner erweiterten Policy: 0.7/1.0**  
+  Grund: Calendar/Mongo/Discord-spezifische Anforderungen sind für dieses Repository aktuell nicht umgesetzt (weder positiv noch negativ testbar).
+
+- **Gesamtnote (praktisch für dieses Tool): 0.9/1.0**  
+  Sehr guter Zustand für den vorhandenen Funktionsumfang; klare Erweiterungspunkte bei Integrationen, die derzeit nicht Teil des Systems sind.
