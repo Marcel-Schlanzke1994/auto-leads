@@ -5,9 +5,11 @@
   <article class="card"><h3>Leads gesamt</h3><p>{{ stats.total }}</p></article>
   <article class="card"><h3>Neue Leads</h3><p>{{ stats.new }}</p></article>
   <article class="card"><h3>High Score (>=70)</h3><p>{{ stats.high_score }}</p></article>
+  <article class="card"><h3>Mit Website</h3><p>{{ stats.with_website }}</p></article>
   <article class="card"><h3>Mit E-Mail</h3><p>{{ stats.with_email }}</p></article>
   <article class="card"><h3>Mit Telefon</h3><p>{{ stats.with_phone }}</p></article>
   <article class="card"><h3>Impressum gefunden</h3><p>{{ stats.impressum_found }}</p></article>
+  <article class="card"><h3>Mit Google Rating</h3><p>{{ stats.with_google_rating }}</p></article>
 </section>
 
 {% if latest_job %}
@@ -15,9 +17,18 @@
   <h2>Letzter Suchjob #{{ latest_job.id }}</h2>
   <p>Status: <span id="job-status" class="pill {{ latest_job.status }}">{{ latest_job.status }}</span></p>
   <p id="job-message">{{ latest_job.message }}</p>
-  {% set progress = (latest_job.processed / latest_job.total * 100) if latest_job.total else 0 %}
+  {% set progress = (latest_job.total_created / latest_job.target_count * 100) if latest_job.target_count else 0 %}
   <div class="progress"><div id="job-progress-bar" class="progress-bar" style="width: {{ progress }}%"></div></div>
-  <small id="job-meta">{{ latest_job.processed }} / {{ latest_job.total }} verarbeitet · {{ latest_job.created }} erstellt · {{ latest_job.skipped_duplicates }} Dubletten · {{ latest_job.errors }} Fehler</small>
+  <small id="job-meta">
+    Ziel {{ latest_job.total_created }} / {{ latest_job.target_count }} neue Leads ·
+    Roh {{ latest_job.total_found_raw }} ·
+    Verarbeitet {{ latest_job.total_processed }} ·
+    Dubletten {{ latest_job.duplicates_skipped }} ·
+    Gefiltert {{ latest_job.filtered_out }} ·
+    Fehler {{ latest_job.errors }} ·
+    Stadt {{ latest_job.current_city or '-' }} ·
+    Query {{ latest_job.current_query or '-' }}
+  </small>
 </section>
 {% endif %}
 
@@ -37,8 +48,8 @@
           <th>E-Mail</th>
           <th>Telefon</th>
           <th>Inhaber/GF</th>
-          <th>Rating</th>
-          <th>Reviews</th>
+          <th>Google Sterne</th>
+          <th>Bewertungen</th>
           <th>Score</th>
           <th>Status</th>
           <th>Quelle</th>

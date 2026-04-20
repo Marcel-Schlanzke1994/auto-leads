@@ -29,11 +29,18 @@ def api_search_start():
     payload = request.get_json(silent=True) or {}
     keyword = str(payload.get("keyword") or "").strip()
     cities_raw = str(payload.get("cities") or "").strip()
+    target_count = int(payload.get("target_count") or 1000)
+
     if not keyword or not cities_raw:
         return jsonify({"error": "keyword and cities are required"}), 400
 
     cities = [c.strip() for c in cities_raw.split(",") if c.strip()]
-    job = start_search_job(current_app._get_current_object(), keyword, cities)
+    job = start_search_job(
+        current_app._get_current_object(),
+        keyword,
+        cities,
+        target_count=max(1, min(target_count, 1000)),
+    )
     return jsonify({"job_id": job.id, "status": job.status}), 202
 
 

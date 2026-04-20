@@ -7,7 +7,7 @@
     {{ form.hidden_tag() }}
     <label>Suchbegriff {{ form.keyword(placeholder='z. B. Dachdecker') }}</label>
     <label>Städte (kommagetrennt) {{ form.cities(placeholder='Köln, Bonn, Leverkusen') }}</label>
-    <label>Radius (optional Meter) {{ form.radius(placeholder='5000') }}</label>
+    <label>Zielanzahl (max. 1000) {{ form.target_count(value=form.target_count.data or 1000, min=1, max=1000) }}</label>
     <div>{{ form.submit(class_='btn') }}</div>
   </form>
 </section>

@@ -26,18 +26,17 @@ web_bp = Blueprint("web", __name__)
 @web_bp.get("/")
 def dashboard() -> str:
     leads = Lead.query.order_by(Lead.score.desc(), Lead.created_at.desc()).all()
-    status_counts: dict[str, int] = {}
-    for lead in leads:
-        status_counts[lead.status] = status_counts.get(lead.status, 0) + 1
-
     stats = {
         "total": len(leads),
         "new": sum(1 for lead_item in leads if lead_item.status == "new"),
         "high_score": sum(1 for lead_item in leads if lead_item.score >= 70),
+        "with_website": sum(1 for lead_item in leads if lead_item.website),
         "with_email": sum(1 for lead_item in leads if lead_item.email),
         "with_phone": sum(1 for lead_item in leads if lead_item.phone),
         "impressum_found": sum(1 for lead_item in leads if lead_item.impressum_found),
-        "status_counts": status_counts,
+        "with_google_rating": sum(
+            1 for lead_item in leads if lead_item.google_rating is not None
+        ),
     }
     latest_job = SearchJob.query.order_by(SearchJob.id.desc()).first()
     return render_template(
@@ -51,14 +50,11 @@ def search() -> str:
     form = SearchForm()
     if form.validate_on_submit():
         cities = [c.strip() for c in form.cities.data.split(",") if c.strip()]
-        radius = None
-        if form.radius.data and form.radius.data.strip().isdigit():
-            radius = int(form.radius.data.strip())
         job = start_search_job(
             current_app._get_current_object(),
             keyword=form.keyword.data.strip(),
             cities=cities,
-            radius=radius,
+            target_count=form.target_count.data or 1000,
         )
         flash(f"Suchjob #{job.id} gestartet", "success")
         return redirect(url_for("web.dashboard"))
@@ -158,6 +154,7 @@ def export_csv() -> Response:
             "google_rating",
             "review_count",
             "score",
+            "score_reasons",
             "status",
             "source_query",
             "impressum_found",
@@ -181,6 +178,7 @@ def export_csv() -> Response:
                 lead.google_rating,
                 lead.review_count,
                 lead.score,
+                lead.score_reasons,
                 lead.status,
                 lead.source_query,
                 lead.impressum_found,
