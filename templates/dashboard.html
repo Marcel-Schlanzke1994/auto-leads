@@ -1,55 +1,50 @@
 {% extends 'base.html' %}
+{% block title %}Dashboard - Auto Leads{% endblock %}
 {% block content %}
-<section class="hero">
-  <h1>Lead Dashboard</h1>
-  <p>Leads erfassen, auditieren, priorisieren und anschreiben.</p>
+<section class="cards">
+  <article class="card"><h3>Leads gesamt</h3><p>{{ stats.total }}</p></article>
+  <article class="card"><h3>Neue Leads</h3><p>{{ stats.new }}</p></article>
+  <article class="card"><h3>High Score (>=70)</h3><p>{{ stats.high_score }}</p></article>
+  <article class="card"><h3>Mit E-Mail</h3><p>{{ stats.with_email }}</p></article>
+  <article class="card"><h3>Mit Telefon</h3><p>{{ stats.with_phone }}</p></article>
+  <article class="card"><h3>Impressum gefunden</h3><p>{{ stats.impressum_found }}</p></article>
 </section>
 
-<section class="stats-grid">
-  <div class="card stat"><strong>{{ stats.total }}</strong><span>Gesamt</span></div>
-  <div class="card stat"><strong>{{ stats.high_score }}</strong><span>High Score (50+)</span></div>
-  <div class="card stat"><strong>{{ stats.contacted }}</strong><span>Kontaktiert</span></div>
-  <div class="card stat"><strong>{{ stats.won }}</strong><span>Gewonnen</span></div>
+{% if latest_job %}
+<section class="panel">
+  <h2>Letzter Suchjob #{{ latest_job.id }}</h2>
+  <p>Status: <span class="pill {{ latest_job.status }}">{{ latest_job.status }}</span></p>
+  <p>{{ latest_job.message }}</p>
+  <div class="progress"><div class="progress-bar" style="width: {{ (latest_job.processed / latest_job.total * 100) if latest_job.total else 0 }}%"></div></div>
+  <small>{{ latest_job.processed }} / {{ latest_job.total }} verarbeitet · {{ latest_job.created }} erstellt · {{ latest_job.skipped_duplicates }} Dubletten</small>
 </section>
+{% endif %}
 
-<section class="card">
-  <div class="table-head">
-    <h2>Leads</h2>
-    <a class="btn" href="{{ url_for('new_lead') }}">+ Lead</a>
-  </div>
-  <div class="table-wrap">
-    <table>
-      <thead>
-        <tr>
-          <th>Firma</th>
-          <th>Branche</th>
-          <th>Stadt</th>
-          <th>Score</th>
-          <th>Status</th>
-          <th>Website</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for lead in leads %}
-        <tr>
-          <td><a href="{{ url_for('lead_detail', lead_id=lead.id) }}">{{ lead.company_name }}</a></td>
-          <td>{{ lead.industry or '—' }}</td>
-          <td>{{ lead.city or '—' }}</td>
-          <td><span class="pill score">{{ lead.score }}</span></td>
-          <td><span class="pill">{{ lead.status }}</span></td>
-          <td>
-            {% if lead.website %}
-              <a href="{{ lead.website }}" target="_blank" rel="noopener noreferrer">öffnen</a>
-            {% else %}
-              —
-            {% endif %}
-          </td>
-        </tr>
-        {% else %}
-        <tr><td colspan="6">Noch keine Leads vorhanden.</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
+<section class="panel">
+  <h2>Leadliste</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Firma</th><th>Stadt</th><th>Website</th><th>E-Mail</th><th>Telefon</th><th>Rating</th><th>Reviews</th><th>Score</th><th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for lead in leads %}
+      <tr>
+        <td><a href="{{ url_for('web.lead_detail', lead_id=lead.id) }}">{{ lead.company_name }}</a></td>
+        <td>{{ lead.city or '-' }}</td>
+        <td>{% if lead.website %}<a href="{{ lead.website }}" target="_blank" rel="noopener noreferrer">{{ lead.website }}</a>{% else %}-{% endif %}</td>
+        <td>{{ lead.email or '-' }}</td>
+        <td>{{ lead.phone or '-' }}</td>
+        <td>{{ lead.google_rating or '-' }}</td>
+        <td>{{ lead.review_count or '-' }}</td>
+        <td><span class="score">{{ lead.score }}</span></td>
+        <td><span class="pill {{ lead.status }}">{{ lead.status }}</span></td>
+      </tr>
+    {% else %}
+      <tr><td colspan="9">Keine Leads vorhanden.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
 </section>
 {% endblock %}
