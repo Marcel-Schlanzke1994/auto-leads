@@ -1,3 +1,5 @@
+from types import SimpleNamespace
+
 from auto_leads.extensions import db
 from auto_leads.models import Lead, SearchJob
 from auto_leads.services.dedupe import is_duplicate_candidate
@@ -95,6 +97,25 @@ def test_api_endpoints(client, app):
     progress_resp = client.get("/api/search/progress")
     assert progress_resp.status_code == 200
     assert "status" in progress_resp.get_json()
+
+
+def test_api_search_start(client, app, monkeypatch):
+    def fake_start_search_job(flask_app, keyword, cities, radius=None):
+        assert flask_app is app
+        assert keyword == "Elektriker"
+        assert cities == ["Köln", "Bonn"]
+        return SimpleNamespace(id=123, status="queued")
+
+    monkeypatch.setattr("auto_leads.routes.api.start_search_job", fake_start_search_job)
+    response = client.post(
+        "/api/search/start",
+        json={"keyword": "Elektriker", "cities": "Köln, Bonn"},
+    )
+
+    assert response.status_code == 202
+    payload = response.get_json()
+    assert payload["job_id"] == 123
+    assert payload["status"] == "queued"
 
 
 def test_csv_export(client, app):
