@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import io
+import ipaddress
 import os
 import re
 from datetime import UTC, datetime
@@ -146,6 +147,13 @@ def calculate_lead_score(lead: Lead) -> tuple[int, list[str]]:
 
 
 def audit_website(url: str, timeout: float) -> dict[str, Any]:
+    parsed = urlparse(url)
+    hostname = parsed.hostname
+    if not hostname:
+        raise ValueError("Ungültige Website-URL (Host fehlt).")
+    if _is_private_hostname(hostname):
+        raise ValueError("Lokale/private Hosts sind für Audits nicht erlaubt.")
+
     started = datetime.now(UTC)
     response = requests.get(
         url, timeout=timeout, headers={"User-Agent": "auto-leads/1.0"}
@@ -254,7 +262,7 @@ def register_routes(app: Flask) -> None:
                 company_name=company_name,
                 industry=(request.form.get("industry") or "").strip() or None,
                 city=(request.form.get("city") or "").strip() or None,
-                website=(request.form.get("website") or "").strip() or None,
+                website=_normalize_website_url(request.form.get("website")),
                 email=(request.form.get("email") or "").strip() or None,
                 phone=(request.form.get("phone") or "").strip() or None,
                 google_rating=_to_float(request.form.get("google_rating")),
@@ -268,17 +276,12 @@ def register_routes(app: Flask) -> None:
                         lead.website, app.config["REQUEST_TIMEOUT"]
                     )
                     apply_audit_to_lead(lead, audit_result)
-                except requests.RequestException as exc:
-                    score, reasons = calculate_lead_score(lead)
-                    lead.score = score
-                    lead.score_reasons = "\n".join(
-                        reasons
-                        + [f"Website-Audit fehlgeschlagen: {exc.__class__.__name__}"]
+                except (requests.RequestException, ValueError) as exc:
+                    _set_default_score(
+                        lead, f"Website-Audit fehlgeschlagen: {exc.__class__.__name__}"
                     )
             else:
-                score, reasons = calculate_lead_score(lead)
-                lead.score = score
-                lead.score_reasons = "\n".join(reasons)
+                _set_default_score(lead)
 
             db.session.add(lead)
             db.session.commit()
@@ -331,7 +334,7 @@ def register_routes(app: Flask) -> None:
             apply_audit_to_lead(lead, audit_result)
             db.session.commit()
             flash("Audit erfolgreich neu ausgeführt.", "success")
-        except requests.RequestException as exc:
+        except (requests.RequestException, ValueError) as exc:
             flash(f"Audit fehlgeschlagen: {exc}", "error")
 
         return redirect(url_for("lead_detail", lead_id=lead.id))
@@ -363,7 +366,7 @@ def register_routes(app: Flask) -> None:
                     company_name=company_name,
                     industry=(row.get("industry") or "").strip() or None,
                     city=(row.get("city") or "").strip() or None,
-                    website=(row.get("website") or "").strip() or None,
+                    website=_normalize_website_url(row.get("website")),
                     email=(row.get("email") or "").strip() or None,
                     phone=(row.get("phone") or "").strip() or None,
                     google_rating=_to_float(row.get("google_rating")),
@@ -378,14 +381,10 @@ def register_routes(app: Flask) -> None:
                             app.config["REQUEST_TIMEOUT"],
                         )
                         apply_audit_to_lead(lead, audit_result)
-                    except requests.RequestException:
-                        score, reasons = calculate_lead_score(lead)
-                        lead.score = score
-                        lead.score_reasons = "\n".join(reasons)
+                    except (requests.RequestException, ValueError):
+                        _set_default_score(lead)
                 else:
-                    score, reasons = calculate_lead_score(lead)
-                    lead.score = score
-                    lead.score_reasons = "\n".join(reasons)
+                    _set_default_score(lead)
 
                 db.session.add(lead)
                 created += 1
@@ -443,14 +442,10 @@ def register_cli(app: Flask) -> None:
                         lead.website, app.config["REQUEST_TIMEOUT"]
                     )
                     apply_audit_to_lead(lead, audit_result)
-                except requests.RequestException:
-                    score, reasons = calculate_lead_score(lead)
-                    lead.score = score
-                    lead.score_reasons = "\n".join(reasons)
+                except (requests.RequestException, ValueError):
+                    _set_default_score(lead)
             else:
-                score, reasons = calculate_lead_score(lead)
-                lead.score = score
-                lead.score_reasons = "\n".join(reasons)
+                _set_default_score(lead)
             db.session.add(lead)
 
         db.session.commit()
@@ -474,6 +469,44 @@ def _to_int(value: Any) -> int | None:
         return int(cleaned)
     except ValueError:
         return None
+
+
+def _normalize_website_url(value: Any) -> str | None:
+    raw = (str(value).strip() if value is not None else "").strip()
+    if not raw:
+        return None
+    normalized = raw if "://" in raw else f"https://{raw}"
+    parsed = urlparse(normalized)
+    if parsed.scheme not in {"http", "https"}:
+        return None
+    if not parsed.netloc:
+        return None
+    return normalized
+
+
+def _is_private_hostname(hostname: str) -> bool:
+    lowered = hostname.lower()
+    if lowered in {"localhost"}:
+        return True
+    try:
+        ip = ipaddress.ip_address(lowered)
+    except ValueError:
+        return lowered.endswith(".local")
+    return (
+        ip.is_private
+        or ip.is_loopback
+        or ip.is_link_local
+        or ip.is_multicast
+        or ip.is_reserved
+    )
+
+
+def _set_default_score(lead: Lead, extra_reason: str | None = None) -> None:
+    score, reasons = calculate_lead_score(lead)
+    lead.score = score
+    if extra_reason:
+        reasons.append(extra_reason)
+    lead.score_reasons = "\n".join(reasons)
 
 
 app = create_app()
