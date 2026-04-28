@@ -21,7 +21,7 @@ from app.services.lead_score_service import (
 )
 from app.services.website_audit_service import audit_website, persist_audit_result
 from app.extensions import db
-from app.forms import StatusForm
+from app.forms import OUTREACH_STATUS_LABELS, StatusForm
 
 
 leads_bp = Blueprint("leads", __name__, url_prefix="/leads")
@@ -136,6 +136,7 @@ def leads_list() -> str:
         leads=leads,
         filters=filters,
         statuses=statuses,
+        status_labels=OUTREACH_STATUS_LABELS,
         score_ranges=SCORE_RANGES,
     )
 
@@ -186,6 +187,7 @@ def lead_detail(lead_id: int) -> str:
         "lead_detail.html",
         lead=lead,
         status_form=status_form,
+        status_labels=OUTREACH_STATUS_LABELS,
         latest_audit=latest_audit,
         issue_counts=defaultdict(int, issue_counts),
         quick_wins=quick_wins,
@@ -203,7 +205,11 @@ def update_status(lead_id: int):
 
     form = StatusForm()
     if form.validate_on_submit():
-        lead.status = form.status.data
+        selected_status = (form.status.data or "").strip()
+        if selected_status not in OUTREACH_STATUS_LABELS:
+            flash("Ungültiger Status", "error")
+            return redirect(url_for("leads.lead_detail", lead_id=lead.id))
+        lead.status = selected_status
         db.session.commit()
         flash("Status aktualisiert", "success")
     else:

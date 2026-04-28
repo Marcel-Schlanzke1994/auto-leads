@@ -3,6 +3,7 @@
 {% block content %}
 <section class="panel">
   <h2>{{ lead.company_name }}</h2>
+  <p><strong>Status:</strong> <span class="pill {{ lead.status }}">{{ status_labels.get(lead.status, lead.status) }}</span></p>
   <p><strong>Adresse:</strong> {{ lead.address or '-' }}</p>
   <p><strong>Website:</strong> {% if lead.website %}<a href="{{ lead.website }}" target="_blank" rel="noopener noreferrer">{{ lead.website }}</a>{% else %}-{% endif %}</p>
   <p><strong>E-Mail:</strong> {{ lead.email or '-' }} | <strong>Telefon:</strong> {{ lead.phone or '-' }}</p>
