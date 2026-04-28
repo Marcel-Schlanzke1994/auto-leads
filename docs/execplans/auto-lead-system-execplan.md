@@ -100,3 +100,63 @@ Zusätzlich empfohlen:
 - Reproduzierbare Lead-Ergebnisse mit auditierbarer Herleitung.
 - Schnellere Fehlersuche durch klaren Datenfluss und bessere Betriebsdokumentation.
 - Höhere Betriebssicherheit durch verbindliche CI-/Security-Gates.
+
+## 18) Subagent Integration Update (2026-04-28)
+### Why
+- Vollständige Integration eines kuratierten Subagent-Katalogs, damit Codex Aufgaben rollenbasiert, sicher und nachvollziehbar delegieren kann.
+- Ziel: bessere Planbarkeit, höhere Review-Qualität und geringere Fehlerrisiken bei komplexen Änderungen.
+
+### Chosen structure
+- Alle Agent-Dateien liegen projektlokal in `.codex/agents/`.
+- Basis: 136 Agents aus `awesome-codex-subagents`.
+- Ergänzung: 8 projektbezogene Alias-Agenten (`planner`, `orchestrator`, `database-architect`, `test-engineer`, `ci-cd-specialist`, `documentation-writer`, `performance-optimizer`, `scraper-extractor`).
+- Kuration und Nutzungsleitfaden in `docs/SUBAGENTS.md`.
+- Sicherheitsprüfung und Markierungen in `docs/SUBAGENTS_AUDIT.md`.
+
+### Security decisions
+- Keine Übernahme von `danger-full-access`-Konfigurationen.
+- Sicherheits-/Reviewer-Rollen bevorzugt read-only.
+- Schreibkonflikte werden organisatorisch unterbunden (keine parallelen Writes auf dieselben Dateien).
+- Codex-Workspace-Defaults gehärtet: `workspace-write`, `on-request`, `network = restricted`.
+
+### Future usage in Codex
+- Komplexe Features starten mit `planner` + ExecPlan-Update.
+- Multi-Teilaufgaben über `orchestrator` mit klaren Integrations-Gates.
+- Security/Review/Test/CI explizit über spezialisierte Agenten routen.
+
+### Validation checklist
+- Dateistruktur geprüft (`.codex/agents/`, `docs/`).
+- TOML syntaktisch validierbar (per Python `tomllib`).
+- Secret-Pattern-Scan ohne Treffer.
+- Risiko-Scan auf destruktive Agent-Prompts ohne kritische Findings.
+
+### Progress
+- Status: done
+- Last update: 2026-04-28
+- Completed since last update:
+  - 136 externe Subagents integriert.
+  - 8 projektbezogene Alias-Subagents ergänzt.
+  - AGENTS-, Config-, Audit- und Katalogdokumentation aktualisiert.
+- Next actions:
+  - Team-Onboarding für empfohlene Kern-Agenten.
+  - Optional: rollenbasierte Prompt-Templates ergänzen.
+- Open blockers:
+  - keine
+
+### Decision Log Addendum
+- Date: 2026-04-28
+  - Decision: Vollständige Übernahme des Community-Katalogs plus projektspezifische Alias-Agenten.
+  - Rationale: Maximale Abdeckung bei gleichzeitiger klarer Projektsteuerung.
+  - Alternatives considered: Nur Teilmenge importieren.
+  - Impact: Höherer Agent-Footprint, aber bessere Delegationsfähigkeit.
+- Date: 2026-04-28
+  - Decision: Sicherheitsrelevante Agenten primär read-only, globale Defaults gehärtet.
+  - Rationale: Least-Privilege und geringeres Fehlerrisiko.
+  - Alternatives considered: Schnellere, aber permissivere Defaults.
+  - Impact: Sichere Standardausführung, bewusste Eskalation nur bei Bedarf.
+
+### Outcomes Addendum
+- Subagent-Ökosystem ist vollständig im Projekt verankert.
+- Delegation wird reproduzierbar, auditierbar und rollenbasiert.
+- Security- und Review-Prozesse sind operationalisiert.
+
