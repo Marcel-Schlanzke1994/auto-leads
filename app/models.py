@@ -256,8 +256,10 @@ class ContactAttempt(db.Model):
     message = db.Column(db.Text)
     recipient = db.Column(db.String(255), index=True)
     attempted_at = db.Column(db.DateTime(timezone=True))
+    scheduled_for = db.Column(db.DateTime(timezone=True))
     response_at = db.Column(db.DateTime(timezone=True))
     response_summary = db.Column(db.Text)
+    notes = db.Column(db.Text)
     meta_json = db.Column(db.JSON)
 
     created_at = db.Column(
@@ -290,6 +292,7 @@ class OutreachDraft(db.Model):
     tone = db.Column(db.String(50))
     subject = db.Column(db.String(255))
     body = db.Column(db.Text, nullable=False)
+    personalization_notes = db.Column(db.Text)
     status = db.Column(db.String(30), nullable=False, default="draft", index=True)
     approved_at = db.Column(db.DateTime(timezone=True))
     sent_at = db.Column(db.DateTime(timezone=True))
