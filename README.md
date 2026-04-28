@@ -169,6 +169,8 @@ Die Cloudflare-Schicht ist aktuell eine **optionale Vorbereitung** und hat keine
 
 Details: `docs/CLOUDFLARE_FOUNDATION.md`
 
+Sandbox-/SSRF-Leitplanken für externe Website-Analysen: `docs/SANDBOX_POLICY.md`
+
 ```bash
 cd cloudflare
 npm install
