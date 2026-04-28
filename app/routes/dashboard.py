@@ -12,8 +12,8 @@ from flask import (
 
 from app.models import Lead, SearchJob
 from app.services.search_runner_service import start_search_job
-from auto_leads.forms import SearchForm
-from auto_leads.extensions import limiter
+from app.forms import SearchForm
+from app.extensions import limiter
 
 
 dashboard_bp = Blueprint("dashboard", __name__)

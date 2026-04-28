@@ -1,4 +1,4 @@
-from auto_leads.extensions import db
+from app.extensions import db
 from app.models import Lead
 from app.services.duplicate_service import (
     is_duplicate,

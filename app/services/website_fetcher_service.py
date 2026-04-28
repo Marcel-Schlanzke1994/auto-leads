@@ -8,7 +8,7 @@ from urllib.parse import urlparse
 import requests
 from flask import current_app, has_app_context
 
-from auto_leads.utils import is_private_hostname
+from app.utils import is_private_hostname
 
 
 DEFAULT_TIMEOUT = float(os.getenv("REQUEST_TIMEOUT", "8"))

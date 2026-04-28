@@ -10,10 +10,12 @@ Auto-Leads ist als Flask-Monolith mit klarer Schichtung aufgebaut:
 
 ## Komponenten
 - **App Factory**: `app.create_app()` initialisiert Config, Extensions, Blueprints.
+- **Zielstruktur (Runtime)**: `app/` ist das einzige Runtime-Package.
 - **Blueprints**:
-  - `app/routes/*` für Dashboard/Leads/Jobs/Export
-  - `auto_leads/routes/api.py` für API-Endpunkte
-  - `auto_leads/routes/web.py` für zusätzliche Web-Routen
+  - `app/routes/*` für Dashboard/Leads/Jobs/Export/API
+  - `app/routes/web_compat.py` als temporäre, **deprecated** Legacy-URL-Schicht
+- **Shared Layer**: `app/extensions.py`, `app/forms.py`, `app/utils.py`
+- **Compatibility Layer**: `auto_leads/*` enthält nur Re-Exports und ist als deprecated markiert.
 - **Services (`app/services/`)**:
   - Suche (`search_runner_service`, `google_places_service`)
   - Datenqualität (`duplicate_service`, `lead_score_service`)

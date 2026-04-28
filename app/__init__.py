@@ -6,13 +6,13 @@ import os
 from dotenv import load_dotenv
 from flask import Flask
 
-from auto_leads.extensions import csrf, db, limiter, migrate
+from app.extensions import csrf, db, limiter, migrate
 from app.routes.dashboard import dashboard_bp
 from app.routes.export import export_bp
 from app.routes.jobs import jobs_bp
 from app.routes.leads import leads_bp
-from auto_leads.routes.api import api_bp
-from auto_leads.routes.web import web_bp
+from app.routes.api import api_bp
+from app.routes.web_compat import web_compat_bp
 from config import Config
 
 
@@ -40,7 +40,7 @@ def create_app(test_config: dict | None = None) -> Flask:
     app.register_blueprint(jobs_bp)
     app.register_blueprint(export_bp)
     app.register_blueprint(api_bp)
-    app.register_blueprint(web_bp)
+    app.register_blueprint(web_compat_bp)
 
     from app import models  # noqa: F401
 

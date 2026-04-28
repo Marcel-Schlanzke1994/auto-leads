@@ -28,8 +28,8 @@ from app.services.lead_score_service import (
     calculate_lead_score_details,
 )
 from app.services.website_audit_service import audit_website, persist_audit_result
-from auto_leads.extensions import db
-from auto_leads.utils import normalize_website_url
+from app.extensions import db
+from app.utils import normalize_website_url
 
 DEFAULT_SAFETY_MAX_RAW_RESULTS = 3000
 DEFAULT_MAX_TARGET_COUNT = 1000

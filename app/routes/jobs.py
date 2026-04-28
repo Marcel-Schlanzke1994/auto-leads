@@ -3,7 +3,7 @@ from __future__ import annotations
 from flask import Blueprint, abort, jsonify, render_template, request
 
 from app.models import SearchJob
-from auto_leads.extensions import db
+from app.extensions import db
 
 jobs_bp = Blueprint("jobs", __name__, url_prefix="/jobs")
 

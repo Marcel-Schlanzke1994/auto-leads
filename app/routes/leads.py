@@ -20,8 +20,8 @@ from app.services.lead_score_service import (
     calculate_lead_score_details,
 )
 from app.services.website_audit_service import audit_website, persist_audit_result
-from auto_leads.extensions import db
-from auto_leads.forms import StatusForm
+from app.extensions import db
+from app.forms import StatusForm
 
 
 leads_bp = Blueprint("leads", __name__, url_prefix="/leads")
