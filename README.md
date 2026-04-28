@@ -163,6 +163,14 @@ Für einen einheitlichen Ablauf zwischen Entwicklern und Agenten gelten folgende
 
 Änderungen sollten immer entlang des ExecPlans geplant und in den oben genannten Dateien konsistent dokumentiert werden.
 
+
+## Sichere E-Mail-Provider (Phase 8)
+
+- Default: `EMAIL_PROVIDER=debug` (nur Preview, kein echter Versand).
+- Optional: Cloudflare Email Provider nur mit explizitem Feature-Flag + Secrets.
+- Kein Bulk-Send, kein Auto-Send.
+- Details: `docs/EMAIL_SENDING_POLICY.md`.
+
 ## Optional Cloudflare Worker Foundation
 
 Die Cloudflare-Schicht ist aktuell eine **optionale Vorbereitung** und hat keinen Einfluss auf das lokale Flask-System.
