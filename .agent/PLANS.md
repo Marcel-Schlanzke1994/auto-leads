@@ -146,3 +146,40 @@ Progress wird fortlaufend aktualisiert, mindestens bei jedem Merge in den Branch
 - Security-/Compliance-kritische Änderungen (externe APIs, Crawling, Export) erfordern expliziten Risiko-Eintrag.
 - Bei Architekturänderungen sind `docs/ARCHITECTURE.md` und der ExecPlan konsistent mitzupflegen.
 - Planänderungen ohne Update von `Decision Log` und `Progress` sind nicht zulässig.
+
+## Objektive ExecPlan-Trigger (verbindlich)
+
+Ein ExecPlan (neu oder Update) ist **pflichtig**, sobald mindestens einer der folgenden Trigger zutrifft:
+
+1. Änderung an **mehr als 3 Dateien**.
+2. Einführung oder wesentliche Änderung einer **neuen externen API**.
+3. Änderungen an **Crawling/Scraping/Web-Extraction**-Logik.
+4. **Datenmodell-/Migration**-Änderung.
+5. Änderungen an **Auth/Session/Security**-Mechanismen.
+6. Änderungen an **Export-/Report-Logik** (inkl. PII-relevanter Felder).
+7. Neue oder wesentlich geänderte **CI/CD-Pipeline**.
+8. Änderungen mit **DSGVO-/Compliance-Relevanz**.
+
+Wenn ein Trigger erfüllt ist, MUSS der Plan vor Merge aktualisiert werden und auf konkrete Evidenz verweisen.
+
+## Skill → ExecPlan-Artefakt-Mapping
+
+| Skill / Skill-Gruppe | Pflicht-Artefakt im ExecPlan |
+|---|---|
+| `backend-api`, `api-documentation` | API-Impact (Verträge, Fehlerfälle, Rückwärtskompatibilität) + Runtime-Verifikation |
+| `database-design` | Migrations- und Rollback-Plan + Datenqualitäts-/Backfill-Strategie |
+| `web-extraction`, `website-audit`, `auto-lead-discovery` | Compliance-Block (robots, ToS, Rate-Limit, DSGVO) + Runtime-Grenzen |
+| `security-review` | Risk-Register-Eintrag mit Severity/Confidence + Mitigation + Residual Risk |
+| `code-review` | Qualitätsbewertung, offene Findings, Merge-Empfehlung oder Blocker |
+| `lead-export`, `export-csv-excel`, `report-generation` | Feld-Whitelist, PII-Minimierung, Empfänger-/Aufbewahrungszweck |
+| `ci-failure-resolution` | Pipeline-Auswirkung, Rollback-Schritte, Monitoring nach Merge |
+| `test-generation`, `debug` | Teststrategie, Regression-Scope, reproduzierbare Repro-/Verifikationsschritte |
+| `documentation` | Aktualisierte Betriebs-/Architektur-/Runbook-Referenzen |
+
+## Multi-Agent-Gate im Plan verankern
+
+Für Trigger-Fälle in Security/API/Crawling/DB/CI muss der Plan zusätzlich enthalten:
+
+- Gate-Reihenfolge: `planner -> reviewer -> security-auditor -> owner-agent`
+- Gate-Inputs/Outputs gemäß `docs/MULTI_AGENT_GATE.md`
+- Finale Merge-/No-Merge-Entscheidung inkl. dokumentiertem Residual Risk
