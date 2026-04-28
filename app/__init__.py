@@ -80,10 +80,7 @@ def _validate_security_config(app: Flask) -> None:
 
     is_dev = bool(app.config.get("TESTING")) or Config.is_development_mode()
 
-    if not is_dev and (
-        not secret_key
-        or secret_key == insecure_placeholder
-    ):
+    if not is_dev and (not secret_key or secret_key == insecure_placeholder):
         raise RuntimeError(
             "SECRET_KEY muss in Produktion gesetzt sein "
             "und darf kein Default-/Placeholder-Wert sein."

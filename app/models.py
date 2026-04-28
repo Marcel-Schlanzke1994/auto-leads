@@ -74,6 +74,12 @@ class Lead(db.Model):
     audit_results = db.relationship(
         "AuditResult", back_populates="lead", cascade="all, delete-orphan"
     )
+    contact_attempts = db.relationship(
+        "ContactAttempt", back_populates="lead", cascade="all, delete-orphan"
+    )
+    outreach_drafts = db.relationship(
+        "OutreachDraft", back_populates="lead", cascade="all, delete-orphan"
+    )
 
     def to_dict(self) -> dict[str, Any]:
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}
@@ -229,6 +235,132 @@ class AuditIssue(db.Model):
     )
 
     audit_result = db.relationship("AuditResult", back_populates="issues")
+
+    def to_dict(self) -> dict[str, Any]:
+        return {c.name: getattr(self, c.name) for c in self.__table__.columns}
+
+
+class ContactAttempt(db.Model):
+    __tablename__ = "contact_attempts"
+
+    id = db.Column(db.Integer, primary_key=True)
+    lead_id = db.Column(
+        db.Integer, db.ForeignKey("leads.id"), nullable=False, index=True
+    )
+
+    channel = db.Column(db.String(30), nullable=False, index=True)
+    status = db.Column(db.String(30), nullable=False, default="planned", index=True)
+    direction = db.Column(db.String(20), nullable=False, default="outbound", index=True)
+    subject = db.Column(db.String(255))
+    message = db.Column(db.Text)
+    recipient = db.Column(db.String(255), index=True)
+    attempted_at = db.Column(db.DateTime(timezone=True))
+    response_at = db.Column(db.DateTime(timezone=True))
+    response_summary = db.Column(db.Text)
+    meta_json = db.Column(db.JSON)
+
+    created_at = db.Column(
+        db.DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC)
+    )
+    updated_at = db.Column(
+        db.DateTime(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
+    )
+
+    lead = db.relationship("Lead", back_populates="contact_attempts")
+
+    def to_dict(self) -> dict[str, Any]:
+        return {c.name: getattr(self, c.name) for c in self.__table__.columns}
+
+
+class OutreachDraft(db.Model):
+    __tablename__ = "outreach_drafts"
+
+    id = db.Column(db.Integer, primary_key=True)
+    lead_id = db.Column(
+        db.Integer, db.ForeignKey("leads.id"), nullable=False, index=True
+    )
+
+    channel = db.Column(db.String(30), nullable=False, index=True)
+    template_key = db.Column(db.String(120), index=True)
+    language = db.Column(db.String(10), nullable=False, default="de", index=True)
+    tone = db.Column(db.String(50))
+    subject = db.Column(db.String(255))
+    body = db.Column(db.Text, nullable=False)
+    status = db.Column(db.String(30), nullable=False, default="draft", index=True)
+    approved_at = db.Column(db.DateTime(timezone=True))
+    sent_at = db.Column(db.DateTime(timezone=True))
+    meta_json = db.Column(db.JSON)
+
+    created_at = db.Column(
+        db.DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC)
+    )
+    updated_at = db.Column(
+        db.DateTime(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
+    )
+
+    lead = db.relationship("Lead", back_populates="outreach_drafts")
+
+    def to_dict(self) -> dict[str, Any]:
+        return {c.name: getattr(self, c.name) for c in self.__table__.columns}
+
+
+class OptOut(db.Model):
+    __tablename__ = "opt_outs"
+
+    id = db.Column(db.Integer, primary_key=True)
+    channel = db.Column(db.String(30), nullable=False, index=True)
+    email = db.Column(db.String(255), index=True)
+    email_normalized = db.Column(db.String(255), index=True)
+    phone = db.Column(db.String(40), index=True)
+    phone_normalized = db.Column(db.String(40), index=True)
+    domain = db.Column(db.String(255), index=True)
+    reason = db.Column(db.String(255))
+    source = db.Column(db.String(100), nullable=False, default="manual")
+    requested_at = db.Column(db.DateTime(timezone=True))
+    meta_json = db.Column(db.JSON)
+
+    created_at = db.Column(
+        db.DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC)
+    )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {c.name: getattr(self, c.name) for c in self.__table__.columns}
+
+
+class Blacklist(db.Model):
+    __tablename__ = "blacklists"
+
+    id = db.Column(db.Integer, primary_key=True)
+    entry_type = db.Column(db.String(20), nullable=False, index=True)
+    value = db.Column(db.String(255), nullable=False, index=True)
+    value_normalized = db.Column(db.String(255), index=True)
+    reason = db.Column(db.String(255))
+    source = db.Column(db.String(100), nullable=False, default="manual")
+    active = db.Column(db.Boolean, nullable=False, default=True, index=True)
+    expires_at = db.Column(db.DateTime(timezone=True))
+    meta_json = db.Column(db.JSON)
+
+    created_at = db.Column(
+        db.DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC)
+    )
+    updated_at = db.Column(
+        db.DateTime(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
+    )
+
+    __table_args__ = (
+        db.UniqueConstraint(
+            "entry_type", "value", name="uq_blacklists_entry_type_value"
+        ),
+    )
 
     def to_dict(self) -> dict[str, Any]:
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}
