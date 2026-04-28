@@ -2,12 +2,108 @@
 {% block title %}Job #{{ job.id }} - Auto Leads{% endblock %}
 {% block content %}
 <section class="panel">
-  <h2>Job #{{ job.id }}</h2>
+  <div class="toolbar">
+    <h2>Job #{{ job.id }}</h2>
+    <a href="{{ url_for('jobs.list_jobs') }}">← Zurück</a>
+  </div>
+
   <p><strong>Keyword:</strong> {{ job.keyword }}</p>
   <p><strong>Städte:</strong> {{ job.cities }}</p>
-  <p><strong>Status:</strong> <span class="pill {{ job.status }}">{{ job.status }}</span></p>
-  <p><strong>Fortschritt:</strong> {{ job.total_created }} / {{ job.target_count }}</p>
-  <p><strong>Verarbeitet:</strong> {{ job.total_processed }} | <strong>Roh:</strong> {{ job.total_found_raw }}</p>
-  <p><strong>Nachricht:</strong> {{ job.message }}</p>
+  <p><strong>Status:</strong> <span id="job-status" class="pill {{ job.status }}">{{ job.status }}</span></p>
+  <p><strong>Aktuelle Stadt:</strong> <span id="current-city">{{ job.current_city or '—' }}</span></p>
+  <p><strong>Aktuelle Query:</strong> <span id="current-query">{{ job.current_query or '—' }}</span></p>
+  <p><strong>Nachricht:</strong> <span id="job-message">{{ job.message }}</span></p>
+
+  <div class="progress" style="margin: .8rem 0;">
+    {% set pct = (job.total_created * 100 / job.target_count) if job.target_count else 0 %}
+    <div id="progress-bar" class="progress-bar" style="width: {{ pct }}%"></div>
+  </div>
+
+  <table>
+    <tbody>
+      <tr><th>Rohdaten</th><td id="metric-raw">{{ job.total_found_raw }}</td></tr>
+      <tr><th>Neue Leads</th><td id="metric-created">{{ job.total_created }}</td></tr>
+      <tr><th>Dubletten</th><td id="metric-duplicates">{{ job.duplicates_skipped }}</td></tr>
+      <tr><th>Fehler</th><td id="metric-errors">{{ job.errors }}</td></tr>
+      <tr><th>Verarbeitet</th><td id="metric-processed">{{ job.total_processed }}</td></tr>
+      <tr><th>Gefiltert</th><td id="metric-filtered">{{ job.filtered_out }}</td></tr>
+      <tr><th>Erstellt</th><td>{{ job.created_at }}</td></tr>
+      <tr><th>Gestartet</th><td>{{ job.started_at }}</td></tr>
+      <tr><th>Beendet</th><td id="finished-at">{{ job.finished_at or '—' }}</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Fortschritts-Log</h3>
+  <pre id="job-log">{{ (job.log_json or []) | tojson(indent=2) }}</pre>
 </section>
+
+<script>
+  (function () {
+    const jobId = {{ job.id }};
+    let cursor = {{ (job.log_json or []) | length }};
+
+    const statusEl = document.getElementById('job-status');
+    const cityEl = document.getElementById('current-city');
+    const queryEl = document.getElementById('current-query');
+    const messageEl = document.getElementById('job-message');
+    const logEl = document.getElementById('job-log');
+
+    const rawEl = document.getElementById('metric-raw');
+    const createdEl = document.getElementById('metric-created');
+    const duplicatesEl = document.getElementById('metric-duplicates');
+    const errorsEl = document.getElementById('metric-errors');
+    const processedEl = document.getElementById('metric-processed');
+    const filteredEl = document.getElementById('metric-filtered');
+    const finishedEl = document.getElementById('finished-at');
+    const progressBar = document.getElementById('progress-bar');
+
+    let allEvents = {{ (job.log_json or []) | tojson }};
+
+    function renderEvents() {
+      logEl.textContent = JSON.stringify(allEvents, null, 2);
+    }
+
+    function tick() {
+      fetch(`/jobs/${jobId}/progress?since=${cursor}`)
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.error) return;
+
+          statusEl.className = `pill ${data.status}`;
+          statusEl.textContent = data.status;
+          cityEl.textContent = data.current_city || '—';
+          queryEl.textContent = data.current_query || '—';
+          messageEl.textContent = data.message || '';
+
+          rawEl.textContent = data.total_found_raw;
+          createdEl.textContent = data.total_created;
+          duplicatesEl.textContent = data.duplicates_skipped;
+          errorsEl.textContent = data.errors;
+          processedEl.textContent = data.total_processed;
+          filteredEl.textContent = data.filtered_out;
+
+          const pct = data.target_count > 0 ? Math.min(100, (data.total_created / data.target_count) * 100) : 0;
+          progressBar.style.width = `${pct}%`;
+
+          if (data.events && data.events.length) {
+            allEvents = allEvents.concat(data.events);
+            renderEvents();
+          }
+          cursor = data.events_total || cursor;
+
+          if (data.status !== 'running' && data.status !== 'queued') {
+            finishedEl.textContent = new Date().toISOString();
+            return;
+          }
+          setTimeout(tick, 2500);
+        })
+        .catch(() => setTimeout(tick, 4000));
+    }
+
+    renderEvents();
+    if (statusEl.textContent === 'running' || statusEl.textContent === 'queued') {
+      setTimeout(tick, 1200);
+    }
+  })();
+</script>
 {% endblock %}

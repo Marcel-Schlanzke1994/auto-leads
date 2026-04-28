@@ -27,6 +27,8 @@ from auto_leads.extensions import db
 from auto_leads.utils import normalize_website_url
 
 SAFETY_MAX_RAW_RESULTS = 3000
+MAX_TARGET_COUNT = 1000
+TEXT_SEARCH_PAGE_LIMIT = 60
 
 
 def start_search_job(
@@ -37,15 +39,23 @@ def start_search_job(
     target_count: int = 1000,
 ) -> SearchJob:
     del radius
+    bounded_target = max(1, min(target_count, MAX_TARGET_COUNT))
     job = SearchJob(
         keyword=keyword,
         cities=", ".join(cities),
         status="queued",
         message="Wartet",
-        target_count=max(1, min(target_count, 1000)),
+        target_count=bounded_target,
+        log_json=[],
     )
     db.session.add(job)
     db.session.commit()
+    _append_job_event(
+        job,
+        phase="queued",
+        message="Job erstellt und in Warteschlange",
+        reason="queued",
+    )
     Thread(
         target=_run_search_job, args=(app, job.id, keyword, cities), daemon=True
     ).start()
@@ -59,14 +69,13 @@ def _run_search_job(app: Flask, job_id: int, keyword: str, cities: list[str]) ->
             return
         client, source_name, provider_error = _create_places_client(app)
         if not client:
-            job.status = "failed"
-            job.message = provider_error or "Places Provider nicht verfügbar"
-            job.finished_at = datetime.now(UTC)
-            db.session.commit()
+            _mark_job_failed(job, provider_error or "Places Provider nicht verfügbar")
             return
+
         job.status = "running"
+        job.started_at = job.started_at or datetime.now(UTC)
         job.message = f"{source_name} Suche läuft"
-        db.session.commit()
+        _append_job_event(job, phase="start", message=job.message)
 
         for city in cities:
             if job.total_created >= job.target_count:
@@ -75,22 +84,33 @@ def _run_search_job(app: Flask, job_id: int, keyword: str, cities: list[str]) ->
             job.current_city = city
             job.current_query = query
             job.message = f"Suche laufend: {query}"
-            db.session.commit()
+            _append_job_event(job, phase="city_start", message=job.message)
 
             remaining = max(0, job.target_count - job.total_created)
             raw_limit = min(max(remaining * 4, 80), SAFETY_MAX_RAW_RESULTS)
             try:
                 batch = client.text_search_paginated(
-                    query, max_results=raw_limit, safety_page_limit=60
+                    query,
+                    max_results=raw_limit,
+                    safety_page_limit=TEXT_SEARCH_PAGE_LIMIT,
                 )
             except GooglePlacesError as exc:
                 job.errors += 1
                 job.message = f"Text Search Fehler: {exc}"
-                db.session.commit()
+                _append_job_event(
+                    job,
+                    phase="text_search_error",
+                    message=job.message,
+                    error=str(exc),
+                )
                 continue
 
             job.total_found_raw += batch.total_found_raw
-            db.session.commit()
+            _append_job_event(
+                job,
+                phase="text_search_done",
+                message=f"{batch.total_found_raw} Roh-Treffer für {query}",
+            )
 
             for place_id in batch.place_ids:
                 if job.total_created >= job.target_count:
@@ -99,6 +119,14 @@ def _run_search_job(app: Flask, job_id: int, keyword: str, cities: list[str]) ->
                     place = client.place_details(place_id)
                     if not _is_relevant_business(place):
                         job.filtered_out += 1
+                        _append_job_event(
+                            job,
+                            phase="filtered_out",
+                            message=(
+                                "Irrelevanter Treffer gefiltert: "
+                                f"{place.display_name}"
+                            ),
+                        )
                         continue
                     lead = _build_lead(place, keyword, query)
                     if is_duplicate(
@@ -110,6 +138,11 @@ def _run_search_job(app: Flask, job_id: int, keyword: str, cities: list[str]) ->
                         email=lead.email,
                     ):
                         job.duplicates_skipped += 1
+                        _append_job_event(
+                            job,
+                            phase="duplicate",
+                            message=f"Dublette übersprungen: {lead.company_name}",
+                        )
                         continue
                     _enrich_lead_with_audit(lead, app)
                     lead.score, reasons = calculate_lead_score(lead)
@@ -117,8 +150,19 @@ def _run_search_job(app: Flask, job_id: int, keyword: str, cities: list[str]) ->
                     db.session.add(lead)
                     db.session.commit()
                     job.total_created += 1
-                except Exception:
+                    _append_job_event(
+                        job,
+                        phase="lead_created",
+                        message=f"Neuer Lead: {lead.company_name}",
+                    )
+                except Exception as exc:  # noqa: BLE001
                     job.errors += 1
+                    _append_job_event(
+                        job,
+                        phase="lead_error",
+                        message=f"Fehler bei Place {place_id}",
+                        error=str(exc),
+                    )
                 finally:
                     job.total_processed += 1
                     job.message = (
@@ -128,16 +172,64 @@ def _run_search_job(app: Flask, job_id: int, keyword: str, cities: list[str]) ->
                     db.session.commit()
 
         if job.total_created >= job.target_count:
+            reason = "target_reached"
             job.message = f"Ziel erreicht: {job.total_created} neue Leads"
-        elif job.status != "failed":
+        else:
+            reason = "no_more_results"
             job.message = (
                 f"Suche abgeschlossen ({job.total_created} neue Leads, "
                 "keine weiteren relevanten Treffer)"
             )
-        if job.status != "failed":
-            job.status = "finished"
+        job.status = "finished"
         job.finished_at = datetime.now(UTC)
-        db.session.commit()
+        _append_job_event(job, phase="finished", message=job.message, reason=reason)
+
+
+def _mark_job_failed(job: SearchJob, reason: str) -> None:
+    job.status = "failed"
+    job.message = reason
+    job.finished_at = datetime.now(UTC)
+    _append_job_event(
+        job, phase="failed", message=reason, reason="provider_unavailable", error=reason
+    )
+
+
+def _job_counters(job: SearchJob) -> dict[str, int]:
+    return {
+        "target": min(job.target_count or 0, MAX_TARGET_COUNT),
+        "raw_found": job.total_found_raw,
+        "processed": job.total_processed,
+        "new_leads": job.total_created,
+        "duplicates": job.duplicates_skipped,
+        "filtered_out": job.filtered_out,
+        "errors": job.errors,
+    }
+
+
+def _append_job_event(
+    job: SearchJob,
+    *,
+    phase: str,
+    message: str,
+    error: str | None = None,
+    reason: str | None = None,
+) -> None:
+    events = list(job.log_json or [])
+    events.append(
+        {
+            "timestamp": datetime.now(UTC).isoformat(),
+            "status": job.status,
+            "city": job.current_city,
+            "query": job.current_query,
+            "phase": phase,
+            "message": message,
+            "reason": reason,
+            "error": error,
+            "counters": _job_counters(job),
+        }
+    )
+    job.log_json = events
+    db.session.commit()
 
 
 def _create_places_client(app: Flask) -> tuple[Any | None, str, str | None]:
@@ -147,8 +239,9 @@ def _create_places_client(app: Flask) -> tuple[Any | None, str, str | None]:
     api_key = (app.config.get("GOOGLE_MAPS_API_KEY") or "").strip()
     if not api_key:
         return None, "google_places", "GOOGLE_MAPS_API_KEY fehlt"
+    timeout = float(app.config["REQUEST_TIMEOUT"])
     return (
-        GooglePlacesClient(api_key, timeout=app.config["REQUEST_TIMEOUT"]),
+        GooglePlacesClient(api_key, timeout=max(1.0, timeout)),
         provider,
         None,
     )
