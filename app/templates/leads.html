@@ -15,7 +15,7 @@
         <select name="status">
           <option value="">Alle</option>
           {% for current in statuses %}
-          <option value="{{ current }}" {% if filters.status == current %}selected{% endif %}>{{ current }}</option>
+          <option value="{{ current }}" {% if filters.status == current %}selected{% endif %}>{{ status_labels.get(current, current) }}</option>
           {% endfor %}
         </select>
       </label>
@@ -94,7 +94,7 @@
           <td>{{ lead.review_count or '-' }}</td>
           <td>{{ lead.google_rating or '-' }}</td>
           <td>{{ lead.score }}</td>
-          <td><span class="pill {{ lead.status }}">{{ lead.status }}</span></td>
+          <td><span class="pill {{ lead.status }}">{{ status_labels.get(lead.status, lead.status) }}</span></td>
         </tr>
         {% else %}
         <tr><td colspan="9">Keine Leads für diese Filter gefunden.</td></tr>
