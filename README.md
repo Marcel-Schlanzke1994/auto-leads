@@ -70,12 +70,14 @@ PAGESPEED_MIN_INTERVAL_SECONDS=0
 python run.py
 ```
 
-Dann im Browser öffnen: `http://127.0.0.1:5000`.
+Hinweis: `python run.py` verwendet `APP_HOST` und `APP_PORT` aus Ihrer `.env` (z. B. `127.0.0.1` und `5000`).
+
+Dann im Browser öffnen: `http://127.0.0.1:5000` (bzw. entsprechend Ihrer `APP_HOST`/`APP_PORT`-Werte).
 
 ## Alternative Starts
 
 ```bash
-flask --app run:app run --host 127.0.0.1 --port 5000
+flask --app run.py run
 ```
 
 ## Security-Hinweise
