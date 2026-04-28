@@ -3,6 +3,14 @@
 {% block content %}
 <section class="panel">
   <h2>{{ lead.company_name }}</h2>
+  {% if opt_out_match or blacklist_match %}
+  <div class="flash error" role="alert">
+    <strong>Kontakt gesperrt:</strong>
+    {% if opt_out_match %}Opt-Out Treffer ({{ opt_out_match|length }}){% endif %}
+    {% if opt_out_match and blacklist_match %} | {% endif %}
+    {% if blacklist_match %}Blacklist Treffer ({{ blacklist_match|length }}){% endif %}
+  </div>
+  {% endif %}
   <p><strong>Status:</strong> <span class="pill {{ lead.status }}">{{ status_labels.get(lead.status, lead.status) }}</span></p>
   <p><strong>Adresse:</strong> {{ lead.address or '-' }}</p>
   <p><strong>Website:</strong> {% if lead.website %}<a href="{{ lead.website }}" target="_blank" rel="noopener noreferrer">{{ lead.website }}</a>{% else %}-{% endif %}</p>
@@ -22,6 +30,96 @@
   <form method="post" action="{{ url_for('leads.rerun_audit', lead_id=lead.id) }}">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
     <button class="btn" type="submit">Audit erneut starten</button>
+  </form>
+</section>
+
+<section class="panel">
+  <h3>Draft erstellen</h3>
+  <form method="post" action="{{ url_for('leads.create_draft', lead_id=lead.id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+    <label>Kanal <input type="text" name="channel" value="email" maxlength="30"></label>
+    <label>Sprache <input type="text" name="language" value="de" maxlength="10"></label>
+    <label>Tone <input type="text" name="tone" maxlength="50"></label>
+    <label>Betreff <input type="text" name="subject" maxlength="255"></label>
+    <label>Text <textarea name="body" rows="5" required></textarea></label>
+    <button class="btn" type="submit">Draft erstellen</button>
+  </form>
+
+  <h4>Vorhandene Drafts</h4>
+  <ul>
+    {% for draft in lead.outreach_drafts %}
+    <li>
+      {{ draft.created_at }} | {{ draft.channel }} | {{ draft.subject or '-' }} | {{ draft.status }}
+    </li>
+    {% else %}
+    <li>Keine Drafts vorhanden.</li>
+    {% endfor %}
+  </ul>
+</section>
+
+<section class="panel">
+  <h3>Kontaktversuch anlegen</h3>
+  <form method="post" action="{{ url_for('leads.create_contact_attempt', lead_id=lead.id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+    <label>Kanal <input type="text" name="channel" value="email" maxlength="30"></label>
+    <label>Status <input type="text" name="status" value="planned" maxlength="30"></label>
+    <label>Richtung <input type="text" name="direction" value="outbound" maxlength="20"></label>
+    <label>Empfänger <input type="text" name="recipient" maxlength="255"></label>
+    <label>Betreff <input type="text" name="subject" maxlength="255"></label>
+    <label>Nachricht <textarea name="message" rows="4"></textarea></label>
+    <label>Antwortnotiz <textarea name="response_summary" rows="3"></textarea></label>
+    <button class="btn" type="submit">Kontaktversuch speichern</button>
+  </form>
+
+  <h4>Vorhandene ContactAttempts</h4>
+  <ul>
+    {% for attempt in lead.contact_attempts %}
+    <li>
+      {{ attempt.created_at }} | {{ attempt.channel }} | {{ attempt.status }} | {{ attempt.recipient or '-' }}
+      {% if attempt.message %}<br><small>{{ attempt.message }}</small>{% endif %}
+    </li>
+    {% else %}
+    <li>Keine ContactAttempts vorhanden.</li>
+    {% endfor %}
+  </ul>
+</section>
+
+<section class="panel split">
+  <form method="post" action="{{ url_for('leads.save_phone_note', lead_id=lead.id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+    <h3>Telefonnotiz speichern</h3>
+    <textarea name="phone_note" rows="3" required></textarea>
+    <button class="btn" type="submit">Telefonnotiz speichern</button>
+  </form>
+
+  <form method="post" action="{{ url_for('leads.set_callback_date', lead_id=lead.id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+    <h3>Callback-Datum setzen</h3>
+    <input type="datetime-local" name="callback_at" required />
+    <button class="btn" type="submit">Callback speichern</button>
+  </form>
+</section>
+
+<section class="panel">
+  <h3>OptOut / Blacklist setzen</h3>
+  <form method="post" action="{{ url_for('leads.set_contact_block', lead_id=lead.id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+    <label>Typ
+      <select name="block_type">
+        <option value="opt_out">Opt-Out</option>
+        <option value="blacklist">Blacklist</option>
+      </select>
+    </label>
+    <label>Kanal (für Opt-Out) <input type="text" name="channel" value="email"></label>
+    <label>Entry-Type (für Blacklist)
+      <select name="entry_type">
+        <option value="email">Email</option>
+        <option value="phone">Phone</option>
+        <option value="domain">Domain</option>
+      </select>
+    </label>
+    <label>Grund <input type="text" name="reason" maxlength="255"></label>
+    <button class="btn" type="submit">Kontakt sperren</button>
   </form>
 </section>
 

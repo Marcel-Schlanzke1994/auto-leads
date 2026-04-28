@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 from collections import defaultdict
+from datetime import UTC, datetime
+from urllib.parse import urlparse
 
 from flask import (
     Blueprint,
@@ -14,7 +16,15 @@ from flask import (
 )
 from sqlalchemy import or_
 
-from app.models import AuditIssue, AuditResult, Lead
+from app.models import (
+    AuditIssue,
+    AuditResult,
+    Blacklist,
+    ContactAttempt,
+    Lead,
+    OptOut,
+    OutreachDraft,
+)
 from app.services.lead_score_service import (
     calculate_lead_score,
     calculate_lead_score_details,
@@ -45,6 +55,22 @@ SCORE_RANGES = {
 
 def _truthy(value: str | None) -> bool:
     return (value or "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _normalize_email(value: str | None) -> str:
+    return (value or "").strip().lower()
+
+
+def _normalize_phone(value: str | None) -> str:
+    raw = (value or "").strip()
+    return "".join(ch for ch in raw if ch.isdigit() or ch == "+")
+
+
+def _extract_domain(value: str | None) -> str:
+    if not value:
+        return ""
+    parsed = urlparse(value if "://" in value else f"https://{value}")
+    return (parsed.netloc or "").lower().removeprefix("www.")
 
 
 def build_lead_query_from_args(args):
@@ -183,6 +209,52 @@ def lead_detail(lead_id: int) -> str:
     except json.JSONDecodeError:
         score_details = None
 
+    email_normalized = _normalize_email(lead.email)
+    phone_normalized = _normalize_phone(lead.phone)
+    domain = _extract_domain(lead.website)
+
+    opt_out_match = (
+        db.session.query(OptOut)
+        .filter(
+            db.or_(
+                db.and_(
+                    OptOut.email_normalized.isnot(None),
+                    OptOut.email_normalized == email_normalized,
+                ),
+                db.and_(
+                    OptOut.phone_normalized.isnot(None),
+                    OptOut.phone_normalized == phone_normalized,
+                ),
+                db.and_(OptOut.domain.isnot(None), OptOut.domain == domain),
+            )
+        )
+        .order_by(OptOut.created_at.desc())
+        .all()
+    )
+
+    blacklist_match = (
+        db.session.query(Blacklist)
+        .filter(Blacklist.active.is_(True))
+        .filter(
+            db.or_(
+                db.and_(
+                    Blacklist.entry_type == "email",
+                    Blacklist.value_normalized == email_normalized,
+                ),
+                db.and_(
+                    Blacklist.entry_type == "phone",
+                    Blacklist.value_normalized == phone_normalized,
+                ),
+                db.and_(
+                    Blacklist.entry_type == "domain",
+                    Blacklist.value_normalized == domain,
+                ),
+            )
+        )
+        .order_by(Blacklist.created_at.desc())
+        .all()
+    )
+
     return render_template(
         "lead_detail.html",
         lead=lead,
@@ -193,6 +265,8 @@ def lead_detail(lead_id: int) -> str:
         quick_wins=quick_wins,
         top_sales_arguments=top_sales_arguments,
         score_details=score_details,
+        opt_out_match=opt_out_match,
+        blacklist_match=blacklist_match,
     )
 
 
@@ -258,6 +332,196 @@ def rerun_audit(lead_id: int):
     except Exception as exc:  # noqa: BLE001
         flash(f"Audit fehlgeschlagen: {exc}", "error")
 
+    return redirect(url_for("leads.lead_detail", lead_id=lead.id))
+
+
+@leads_bp.post("/<int:lead_id>/drafts")
+def create_draft(lead_id: int):
+    lead = db.session.get(Lead, lead_id)
+    if not lead:
+        flash("Lead nicht gefunden", "error")
+        return redirect(url_for("leads.leads_list"))
+
+    channel = (request.form.get("channel") or "email").strip()[:30]
+    subject = (request.form.get("subject") or "").strip()[:255]
+    body = (request.form.get("body") or "").strip()
+    language = (request.form.get("language") or "de").strip()[:10]
+    tone = (request.form.get("tone") or "").strip()[:50]
+    if not body:
+        flash("Draft-Text darf nicht leer sein", "error")
+        return redirect(url_for("leads.lead_detail", lead_id=lead.id))
+
+    draft = OutreachDraft(
+        lead_id=lead.id,
+        channel=channel,
+        subject=subject or None,
+        body=body,
+        language=language,
+        tone=tone or None,
+    )
+    try:
+        with db.session.begin():
+            db.session.add(draft)
+        flash("Draft erstellt", "success")
+    except Exception as exc:  # noqa: BLE001
+        db.session.rollback()
+        flash(f"Draft konnte nicht erstellt werden: {exc}", "error")
+    return redirect(url_for("leads.lead_detail", lead_id=lead.id))
+
+
+@leads_bp.post("/<int:lead_id>/contact-attempts")
+def create_contact_attempt(lead_id: int):
+    lead = db.session.get(Lead, lead_id)
+    if not lead:
+        flash("Lead nicht gefunden", "error")
+        return redirect(url_for("leads.leads_list"))
+
+    attempt = ContactAttempt(
+        lead_id=lead.id,
+        channel=(request.form.get("channel") or "email").strip()[:30],
+        status=(request.form.get("status") or "planned").strip()[:30],
+        direction=(request.form.get("direction") or "outbound").strip()[:20],
+        subject=(request.form.get("subject") or "").strip()[:255] or None,
+        message=(request.form.get("message") or "").strip() or None,
+        recipient=(request.form.get("recipient") or "").strip()[:255] or None,
+        response_summary=(request.form.get("response_summary") or "").strip() or None,
+        attempted_at=datetime.now(UTC),
+    )
+    try:
+        with db.session.begin():
+            db.session.add(attempt)
+        flash("Kontaktversuch angelegt", "success")
+    except Exception as exc:  # noqa: BLE001
+        db.session.rollback()
+        flash(f"Kontaktversuch konnte nicht gespeichert werden: {exc}", "error")
+    return redirect(url_for("leads.lead_detail", lead_id=lead.id))
+
+
+@leads_bp.post("/<int:lead_id>/phone-note")
+def save_phone_note(lead_id: int):
+    lead = db.session.get(Lead, lead_id)
+    if not lead:
+        flash("Lead nicht gefunden", "error")
+        return redirect(url_for("leads.leads_list"))
+
+    note = (request.form.get("phone_note") or "").strip()
+    if not note:
+        flash("Telefonnotiz darf nicht leer sein", "error")
+        return redirect(url_for("leads.lead_detail", lead_id=lead.id))
+    try:
+        with db.session.begin():
+            attempt = ContactAttempt(
+                lead_id=lead.id,
+                channel="phone",
+                status="note",
+                direction="outbound",
+                message=note,
+                attempted_at=datetime.now(UTC),
+            )
+            db.session.add(attempt)
+        flash("Telefonnotiz gespeichert", "success")
+    except Exception as exc:  # noqa: BLE001
+        db.session.rollback()
+        flash(f"Telefonnotiz konnte nicht gespeichert werden: {exc}", "error")
+    return redirect(url_for("leads.lead_detail", lead_id=lead.id))
+
+
+@leads_bp.post("/<int:lead_id>/callback")
+def set_callback_date(lead_id: int):
+    lead = db.session.get(Lead, lead_id)
+    if not lead:
+        flash("Lead nicht gefunden", "error")
+        return redirect(url_for("leads.leads_list"))
+
+    callback_raw = (request.form.get("callback_at") or "").strip()
+    try:
+        callback_dt = datetime.fromisoformat(callback_raw)
+    except ValueError:
+        flash("Ungültiges Callback-Datum", "error")
+        return redirect(url_for("leads.lead_detail", lead_id=lead.id))
+
+    try:
+        with db.session.begin():
+            attempt = ContactAttempt(
+                lead_id=lead.id,
+                channel="phone",
+                status="callback_planned",
+                direction="outbound",
+                message="Callback geplant",
+                attempted_at=callback_dt,
+            )
+            db.session.add(attempt)
+        flash("Callback-Datum gesetzt", "success")
+    except Exception as exc:  # noqa: BLE001
+        db.session.rollback()
+        flash(f"Callback konnte nicht gespeichert werden: {exc}", "error")
+    return redirect(url_for("leads.lead_detail", lead_id=lead.id))
+
+
+@leads_bp.post("/<int:lead_id>/contact-block")
+def set_contact_block(lead_id: int):
+    lead = db.session.get(Lead, lead_id)
+    if not lead:
+        flash("Lead nicht gefunden", "error")
+        return redirect(url_for("leads.leads_list"))
+
+    block_type = (request.form.get("block_type") or "opt_out").strip()
+    channel = (request.form.get("channel") or "email").strip()
+    reason = (request.form.get("reason") or "").strip()[:255] or None
+
+    email_normalized = _normalize_email(lead.email)
+    phone_normalized = _normalize_phone(lead.phone)
+    domain = _extract_domain(lead.website)
+    try:
+        with db.session.begin():
+            if block_type == "blacklist":
+                entry_type = (request.form.get("entry_type") or "email").strip()
+                value_map = {
+                    "email": email_normalized,
+                    "phone": phone_normalized,
+                    "domain": domain,
+                }
+                value_normalized = value_map.get(entry_type, "")
+                if not value_normalized:
+                    flash("Kein gültiger Wert für Blacklist gefunden", "error")
+                    return redirect(url_for("leads.lead_detail", lead_id=lead.id))
+                existing = (
+                    db.session.query(Blacklist)
+                    .filter_by(entry_type=entry_type, value=value_normalized)
+                    .first()
+                )
+                if existing:
+                    existing.active = True
+                    existing.reason = reason or existing.reason
+                else:
+                    db.session.add(
+                        Blacklist(
+                            entry_type=entry_type,
+                            value=value_normalized,
+                            value_normalized=value_normalized,
+                            reason=reason,
+                        )
+                    )
+            else:
+                if not any([email_normalized, phone_normalized, domain]):
+                    flash("Keine Kontaktinformationen für Opt-Out vorhanden", "error")
+                    return redirect(url_for("leads.lead_detail", lead_id=lead.id))
+                db.session.add(
+                    OptOut(
+                        channel=channel,
+                        email=lead.email,
+                        email_normalized=email_normalized or None,
+                        phone=lead.phone,
+                        phone_normalized=phone_normalized or None,
+                        domain=domain or None,
+                        reason=reason,
+                        requested_at=datetime.now(UTC),
+                    )
+                )
+        flash("Kontakt wurde gesperrt", "success")
+    except Exception as exc:  # noqa: BLE001
+        db.session.rollback()
+        flash(f"Sperre konnte nicht gespeichert werden: {exc}", "error")
     return redirect(url_for("leads.lead_detail", lead_id=lead.id))
 
 
