@@ -152,36 +152,41 @@ def _contact_metadata(lead: Lead) -> tuple[str, str, str, bool, int, int]:
     draft_count = len(drafts)
     outreach_allowed = not _is_outreach_blocked(lead)
 
-    timestamps = [
+    contact_timestamps = [
         ts
         for attempt in attempts
-        for ts in (attempt.attempted_at, attempt.response_at, attempt.created_at)
+        for ts in (attempt.attempted_at, attempt.response_at)
         if ts is not None
     ]
-    last_contact_at = max(timestamps) if timestamps else None
+    last_contact_at = max(contact_timestamps) if contact_timestamps else None
 
     callback_attempts = [
         attempt
         for attempt in attempts
-        if attempt.status == "callback_planned" and attempt.attempted_at is not None
+        if attempt.status == "callback_planned"
+        and (attempt.scheduled_for is not None or attempt.attempted_at is not None)
     ]
     next_callback_at = None
     if callback_attempts:
         now_aware = datetime.now(UTC)
         now_naive = now_aware.replace(tzinfo=None)
+
+        def _callback_at(attempt):
+            return attempt.scheduled_for or attempt.attempted_at
+
         future_callbacks = [
-            attempt.attempted_at
+            _callback_at(attempt)
             for attempt in callback_attempts
             if (
-                attempt.attempted_at >= now_aware
-                if attempt.attempted_at.tzinfo is not None
-                else attempt.attempted_at >= now_naive
+                _callback_at(attempt) >= now_aware
+                if _callback_at(attempt).tzinfo is not None
+                else _callback_at(attempt) >= now_naive
             )
         ]
         if future_callbacks:
             next_callback_at = min(future_callbacks)
         else:
-            next_callback_at = max(a.attempted_at for a in callback_attempts)
+            next_callback_at = max(_callback_at(a) for a in callback_attempts)
 
     latest_attempt = None
     if attempts:

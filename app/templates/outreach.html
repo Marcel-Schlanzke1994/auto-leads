@@ -99,7 +99,7 @@
       <tbody>
         {% for attempt in callback_items %}
         <tr>
-          <td>{{ attempt.attempted_at.strftime('%Y-%m-%d %H:%M') if attempt.attempted_at else '-' }}</td>
+          <td>{{ (attempt.scheduled_for or attempt.attempted_at).strftime('%Y-%m-%d %H:%M') if (attempt.scheduled_for or attempt.attempted_at) else '-' }}</td>
           <td><a href="{{ url_for('leads.lead_detail', lead_id=attempt.lead_id) }}">{{ attempt.lead.company_name }}</a></td>
           <td>{{ attempt.channel }}</td>
           <td>{{ attempt.message or '-' }}</td>
