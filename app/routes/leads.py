@@ -57,6 +57,15 @@ SCORE_RANGES = {
     "80-100": (80, 100),
 }
 
+LEGACY_OUTREACH_STATUS_MAP = {
+    "follow_up_1": "contacted",
+    "follow_up_2": "callback",
+    "follow_up_3": "callback",
+    "replied": "reviewed",
+    "qualified": "reviewed",
+    "meeting_booked": "won",
+}
+
 
 def _truthy(value: str | None) -> bool:
     return (value or "").strip().lower() in {"1", "true", "yes", "on"}
@@ -76,6 +85,12 @@ def _extract_domain(value: str | None) -> str:
         return ""
     parsed = urlparse(value if "://" in value else f"https://{value}")
     return (parsed.netloc or "").lower().removeprefix("www.")
+
+
+def _map_legacy_outreach_status(value: str, enabled: bool = True) -> str:
+    if not enabled:
+        return value
+    return LEGACY_OUTREACH_STATUS_MAP.get(value, value)
 
 
 def build_lead_query_from_args(args):
@@ -285,11 +300,21 @@ def update_status(lead_id: int):
     form = StatusForm()
     if form.validate_on_submit():
         selected_status = (form.status.data or "").strip()
+        map_legacy = _truthy(request.form.get("map_legacy"))
+        mapped_status = _map_legacy_outreach_status(selected_status, enabled=map_legacy)
         if selected_status not in OUTREACH_STATUS_LABELS:
             flash("Ungültiger Status", "error")
             return redirect(url_for("leads.lead_detail", lead_id=lead.id))
-        lead.status = selected_status
+        lead.status = mapped_status
         db.session.commit()
+        if mapped_status != selected_status:
+            flash(
+                (
+                    f"Legacy-Status '{selected_status}' "
+                    f"wurde auf '{mapped_status}' migriert."
+                ),
+                "info",
+            )
         flash("Status aktualisiert", "success")
     else:
         flash("Ungültiger Status", "error")
