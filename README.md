@@ -4,6 +4,8 @@ Ein lokales Browser-Tool für Lead-Generierung und Lead-Management mit offiziell
 
 ## Features
 
+- Optionale Playwright Browser-Analyse (default: deaktiviert), siehe `docs/PLAYWRIGHT_BROWSER_ANALYSIS.md`.
+
 - Konfiguration vollständig über `.env` (`python-dotenv`)
 - Google Places Text Search + Place Details (offizielle API)
 - Pagination/iterative Folgeabfragen für große Suchläufe
