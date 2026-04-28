@@ -22,7 +22,7 @@ from app.services.google_places_service import (
     PlaceSummary,
 )
 from app.services.lead_score_service import calculate_lead_score
-from app.services.website_audit_service import audit_website
+from app.services.website_audit_service import audit_website, persist_audit_result
 from auto_leads.extensions import db
 from auto_leads.utils import normalize_website_url
 
@@ -214,6 +214,7 @@ def _enrich_lead_with_audit(lead: Lead, app: Flask) -> None:
 
     lead.owner_name = audit.owner_name
     lead.legal_form = audit.legal_form
+    persist_audit_result(lead, audit)
 
 
 def _extract_city(
