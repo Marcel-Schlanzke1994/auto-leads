@@ -1,0 +1,161 @@
+{% extends 'base.html' %}
+{% block title %}Outreach - Auto Leads{% endblock %}
+{% block content %}
+<section class="panel">
+  <h2>Outreach-Cockpit</h2>
+  <form method="get" class="form-grid">
+    <div class="split">
+      <label>Status
+        <select name="status">
+          <option value="">Alle</option>
+          {% for current in available_statuses %}
+          <option value="{{ current }}" {% if filters.status_filter == current %}selected{% endif %}>{{ status_labels.get(current, current) }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Min. Score
+        <input name="score_min" type="number" min="0" max="100" value="{{ filters.score_min }}" placeholder="z. B. 70" />
+      </label>
+      <label>Stadt
+        <input name="city" type="text" value="{{ filters.city_filter }}" placeholder="z. B. Köln" />
+      </label>
+      <label>Branche
+        <input name="industry" type="text" value="{{ filters.industry_filter }}" placeholder="z. B. Dachdecker" />
+      </label>
+    </div>
+    <div class="toolbar">
+      <button class="btn" type="submit">Filter anwenden</button>
+      <a class="btn" href="{{ url_for('outreach.outreach_overview') }}">Filter zurücksetzen</a>
+    </div>
+  </form>
+</section>
+
+<section class="cards">
+  {% for status, count in status_counts %}
+  <article class="card">
+    <h3>{{ status_labels.get(status, status) }}</h3>
+    <p>{{ count }}</p>
+  </article>
+  {% else %}
+  <article class="card"><h3>Keine Daten</h3><p>0</p></article>
+  {% endfor %}
+</section>
+
+<section class="panel">
+  <h3>Hot Leads ohne Kontakt</h3>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Firma</th><th>Stadt</th><th>Branche</th><th>Score</th><th>Status</th></tr>
+      </thead>
+      <tbody>
+        {% for lead in hot_leads %}
+        <tr>
+          <td><a href="{{ url_for('leads.lead_detail', lead_id=lead.id) }}">{{ lead.company_name }}</a></td>
+          <td>{{ lead.city or '-' }}</td>
+          <td>{{ lead.industry or '-' }}</td>
+          <td>{{ lead.score }}</td>
+          <td><span class="pill {{ lead.status }}">{{ status_labels.get(lead.status, lead.status) }}</span></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5">Keine Hot Leads ohne Kontakt vorhanden.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="panel">
+  <h3>Drafts zur Prüfung</h3>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Erstellt</th><th>Lead</th><th>Kanal</th><th>Betreff</th><th>Status</th></tr>
+      </thead>
+      <tbody>
+        {% for draft in drafts_for_review %}
+        <tr>
+          <td>{{ draft.created_at.strftime('%Y-%m-%d %H:%M') if draft.created_at else '-' }}</td>
+          <td><a href="{{ url_for('leads.lead_detail', lead_id=draft.lead_id) }}">{{ draft.lead.company_name }}</a></td>
+          <td>{{ draft.channel }}</td>
+          <td>{{ draft.subject or '-' }}</td>
+          <td><span class="pill">{{ draft.status }}</span></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5">Keine Drafts zur Prüfung vorhanden.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="panel">
+  <h3>Callback-Liste</h3>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Termin</th><th>Lead</th><th>Kanal</th><th>Notiz</th></tr>
+      </thead>
+      <tbody>
+        {% for attempt in callback_items %}
+        <tr>
+          <td>{{ attempt.attempted_at.strftime('%Y-%m-%d %H:%M') if attempt.attempted_at else '-' }}</td>
+          <td><a href="{{ url_for('leads.lead_detail', lead_id=attempt.lead_id) }}">{{ attempt.lead.company_name }}</a></td>
+          <td>{{ attempt.channel }}</td>
+          <td>{{ attempt.message or '-' }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="4">Keine geplanten Callbacks vorhanden.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="panel">
+  <h3>OptOut / Blacklist Übersicht</h3>
+  <div class="split">
+    <div class="table-wrap" style="width: 100%;">
+      <h4>OptOut (neueste)</h4>
+      <table>
+        <thead>
+          <tr><th>Datum</th><th>Kanal</th><th>Kontakt</th><th>Grund</th></tr>
+        </thead>
+        <tbody>
+          {% for item in opt_out_items %}
+          <tr>
+            <td>{{ item.created_at.strftime('%Y-%m-%d') if item.created_at else '-' }}</td>
+            <td>{{ item.channel }}</td>
+            <td>{{ item.email or item.phone or item.domain or '-' }}</td>
+            <td>{{ item.reason or '-' }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="4">Keine OptOut-Einträge vorhanden.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="table-wrap" style="width: 100%;">
+      <h4>Blacklist (aktiv)</h4>
+      <table>
+        <thead>
+          <tr><th>Datum</th><th>Typ</th><th>Wert</th><th>Grund</th></tr>
+        </thead>
+        <tbody>
+          {% for item in blacklist_items %}
+          <tr>
+            <td>{{ item.created_at.strftime('%Y-%m-%d') if item.created_at else '-' }}</td>
+            <td>{{ item.entry_type }}</td>
+            <td>{{ item.value }}</td>
+            <td>{{ item.reason or '-' }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="4">Keine aktiven Blacklist-Einträge vorhanden.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+{% endblock %}
