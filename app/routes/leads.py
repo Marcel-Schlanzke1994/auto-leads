@@ -621,17 +621,16 @@ def set_callback_date(lead_id: int):
         return redirect(url_for("leads.lead_detail", lead_id=lead.id))
 
     try:
-        with db.session.begin():
-            attempt = ContactAttempt(
-                lead_id=lead.id,
-                channel="phone",
-                status="callback_planned",
-                direction="outbound",
-                message="Callback geplant",
-                scheduled_for=callback_dt,
-                attempted_at=callback_dt,
-            )
-            db.session.add(attempt)
+        attempt = ContactAttempt(
+            lead_id=lead.id,
+            channel="phone",
+            status="callback_planned",
+            direction="outbound",
+            message="Callback geplant",
+            scheduled_for=callback_dt,
+        )
+        db.session.add(attempt)
+        db.session.commit()
         flash("Callback-Datum gesetzt", "success")
     except Exception as exc:  # noqa: BLE001
         db.session.rollback()

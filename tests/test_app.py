@@ -435,7 +435,7 @@ def test_csv_export_includes_contact_metadata_fields(client, app):
                     lead_id=lead.id,
                     channel="phone",
                     status="callback_planned",
-                    attempted_at=callback_at,
+                    scheduled_for=callback_at,
                 ),
                 OptOut(
                     channel="email",
@@ -460,11 +460,69 @@ def test_csv_export_includes_contact_metadata_fields(client, app):
     row = dict(zip(header, data, strict=False))
 
     assert row["contact_status"] == "blocked"
-    assert row["last_contact_at"].startswith(callback_at.date().isoformat())
+    assert row["last_contact_at"].startswith(last_attempt_at.date().isoformat())
     assert row["next_callback_at"].startswith(callback_at.date().isoformat())
     assert row["outreach_allowed"] == "False"
     assert row["draft_count"] == "1"
     assert row["attempt_count"] == "2"
+
+
+def test_set_callback_date_saves_scheduled_for_only(client, app):
+    callback_raw = "2031-05-01T09:30:00"
+    with app.app_context():
+        lead = Lead(company_name="Callback GmbH", source_query="q")
+        db.session.add(lead)
+        db.session.commit()
+        lead_id = lead.id
+
+    response = client.post(
+        f"/leads/{lead_id}/callback",
+        data={"callback_at": callback_raw},
+    )
+
+    assert response.status_code == 302
+
+    with app.app_context():
+        attempts = ContactAttempt.query.filter_by(lead_id=lead_id).all()
+        assert len(attempts) == 1
+        attempt = attempts[0]
+        assert attempt.status == "callback_planned"
+        assert attempt.scheduled_for is not None
+        assert attempt.scheduled_for.isoformat().startswith(callback_raw)
+        assert attempt.attempted_at is None
+
+
+def test_outreach_callback_list_uses_scheduled_for_and_sorts(client, app):
+    with app.app_context():
+        lead_late = Lead(company_name="Zulu GmbH", source_query="q")
+        lead_early = Lead(company_name="Alpha GmbH", source_query="q")
+        db.session.add_all([lead_late, lead_early])
+        db.session.flush()
+        db.session.add_all(
+            [
+                ContactAttempt(
+                    lead_id=lead_late.id,
+                    channel="phone",
+                    status="callback_planned",
+                    scheduled_for=datetime(2031, 1, 2, 10, 0, tzinfo=UTC),
+                ),
+                ContactAttempt(
+                    lead_id=lead_early.id,
+                    channel="phone",
+                    status="callback_planned",
+                    scheduled_for=datetime(2031, 1, 1, 10, 0, tzinfo=UTC),
+                ),
+            ]
+        )
+        db.session.commit()
+
+    response = client.get("/outreach")
+    assert response.status_code == 200
+    body = response.get_data(as_text=True)
+
+    assert "2031-01-01 10:00" in body
+    assert "2031-01-02 10:00" in body
+    assert body.index("Alpha GmbH") < body.index("Zulu GmbH")
 
 
 def test_google_provider_requires_api_key(app):

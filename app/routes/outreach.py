@@ -73,7 +73,10 @@ def outreach_overview() -> str:
         ContactAttempt.query.join(Lead, ContactAttempt.lead_id == Lead.id)
         .filter(ContactAttempt.status == "callback_planned")
         .filter(Lead.id.in_(filtered_query.with_entities(Lead.id).subquery()))
-        .order_by(ContactAttempt.attempted_at.asc().nullslast())
+        .order_by(
+            ContactAttempt.scheduled_for.asc().nullslast(),
+            ContactAttempt.attempted_at.asc().nullslast(),
+        )
         .limit(30)
         .all()
     )
