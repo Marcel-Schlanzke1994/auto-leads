@@ -167,6 +167,49 @@ def test_lead_detail_shows_rating_and_reviews(client, app):
     assert "91" in text
 
 
+def test_lead_detail_draft_body_field_is_optional(client, app):
+    with app.app_context():
+        lead = Lead(company_name="Optional Body GmbH", source_query="x")
+        db.session.add(lead)
+        db.session.commit()
+        lead_id = lead.id
+
+    response = client.get(f"/lead/{lead_id}")
+
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert 'name="body"' in html
+    assert 'name="body" rows="5" required' not in html
+    assert "leer lassen für automatische Generierung" in html
+
+
+def test_create_draft_route_generates_body_when_omitted(client, app):
+    with app.app_context():
+        lead = Lead(
+            company_name="Auto Body GmbH",
+            source_query="x",
+            website="https://auto-body.example",
+        )
+        db.session.add(lead)
+        db.session.commit()
+        lead_id = lead.id
+
+    response = client.post(
+        f"/leads/{lead_id}/drafts",
+        data={"channel": "email", "body": ""},
+    )
+    assert response.status_code == 302
+
+    with app.app_context():
+        draft = (
+            OutreachDraft.query.filter_by(lead_id=lead_id, channel="email")
+            .order_by(OutreachDraft.id.desc())
+            .first()
+        )
+        assert draft is not None
+        assert draft.body
+
+
 def test_create_contact_form_draft_route_creates_draft(client, app):
     with app.app_context():
         lead = Lead(
