@@ -63,6 +63,68 @@ def test_draft_generation_blocked_for_blacklist(client, app):
         assert "Blacklist" in (result.error_message or "")
 
 
+def test_draft_generation_blocked_for_company_opt_out(app):
+    with app.app_context():
+        lead = _create_lead(company_name="Musterfirma GmbH")
+        db.session.add(lead)
+        db.session.flush()
+        db.session.add(
+            OptOut(
+                channel="email",
+                company_name=lead.company_name,
+                company_name_normalized="musterfirma",
+            )
+        )
+        db.session.commit()
+
+        result = generate_outreach_draft(lead=lead, channel="email")
+
+        assert result.blocked is True
+        assert result.status == "blocked"
+        assert result.error_code == "outreach_blocked"
+        assert "Unternehmen" in (result.error_message or "")
+
+
+def test_set_contact_block_adds_company_opt_out_and_blacklist(client, app):
+    with app.app_context():
+        lead = _create_lead(company_name="Firmenname GmbH")
+        db.session.add(lead)
+        db.session.commit()
+        lead_id = lead.id
+
+    response_opt_out = client.post(
+        f"/leads/{lead_id}/contact-block",
+        data={
+            "block_type": "opt_out",
+            "channel": "all",
+            "opt_out_company": "1",
+            "reason": "Kein Outreach",
+        },
+    )
+    assert response_opt_out.status_code == 302
+
+    response_blacklist = client.post(
+        f"/leads/{lead_id}/contact-block",
+        data={
+            "block_type": "blacklist",
+            "blacklist_company": "1",
+            "reason": "Do not contact",
+        },
+    )
+    assert response_blacklist.status_code == 302
+
+    with app.app_context():
+        opt_out = OptOut.query.order_by(OptOut.id.desc()).first()
+        assert opt_out is not None
+        assert opt_out.company_name == "Firmenname GmbH"
+        assert opt_out.company_name_normalized == "firmenname"
+
+        blacklist = Blacklist.query.filter_by(entry_type="company").first()
+        assert blacklist is not None
+        assert blacklist.value_normalized == "firmenname"
+        assert blacklist.company_name == "Firmenname GmbH"
+
+
 def test_contact_attempt_creation_persists_required_fields(app):
     with app.app_context():
         lead = _create_lead()

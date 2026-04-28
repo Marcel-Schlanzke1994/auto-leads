@@ -142,8 +142,11 @@
         <option value="email">Email</option>
         <option value="phone">Phone</option>
         <option value="domain">Domain</option>
+        <option value="company">Firma</option>
       </select>
     </label>
+    <label><input type="checkbox" name="opt_out_company" value="1"> Bei Opt-Out auch Firma sperren</label>
+    <label><input type="checkbox" name="blacklist_company" value="1"> Blacklist: Firma sperren (einfacher Modus)</label>
     <label>Grund <input type="text" name="reason" maxlength="255"></label>
     <button class="btn" type="submit">Kontakt sperren</button>
   </form>
