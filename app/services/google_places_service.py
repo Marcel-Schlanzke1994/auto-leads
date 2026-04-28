@@ -2,12 +2,32 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
+import random
 
 import requests
 
 
 class GooglePlacesError(RuntimeError):
-    pass
+    def __init__(
+        self,
+        message: str,
+        *,
+        endpoint: str,
+        attempt: int,
+        status_code: int | None = None,
+        retryable: bool | None = None,
+        cause: str | None = None,
+    ):
+        self.endpoint = endpoint
+        self.attempt = attempt
+        self.status_code = status_code
+        self.retryable = retryable
+        self.cause = cause
+        details = (
+            f"endpoint={endpoint}, attempt={attempt}, status_code={status_code}, "
+            f"retryable={retryable}, cause={cause or 'n/a'}"
+        )
+        super().__init__(f"{message} ({details})")
 
 
 @dataclass(slots=True)
@@ -36,12 +56,87 @@ class GooglePlacesClient:
         api_key: str,
         timeout: float = 8.0,
         min_interval_seconds: float = 2.1,
+        retry_max_attempts: int = 4,
+        retry_backoff_base: float = 0.5,
+        retry_max_delay: float = 8.0,
+        retry_jitter: float = 0.3,
     ):
         self.api_key = api_key
         self.timeout = timeout
         self.min_interval_seconds = min_interval_seconds
+        self.retry_max_attempts = max(1, int(retry_max_attempts))
+        self.retry_backoff_base = max(0.0, float(retry_backoff_base))
+        self.retry_max_delay = max(0.0, float(retry_max_delay))
+        self.retry_jitter = max(0.0, float(retry_jitter))
         self.session = requests.Session()
         self.base = "https://places.googleapis.com/v1"
+
+    def _retry_delay(self, attempt: int) -> float:
+        exponential_delay = self.retry_backoff_base * (2 ** max(0, attempt - 1))
+        jitter = random.uniform(0.0, self.retry_jitter)
+        return min(self.retry_max_delay, exponential_delay + jitter)
+
+    def _request_with_retry(
+        self, method: str, endpoint: str, **request_kwargs: object
+    ) -> requests.Response:
+        retryable_status_codes = {429}
+
+        for attempt in range(1, self.retry_max_attempts + 1):
+            try:
+                response = self.session.request(
+                    method=method, timeout=self.timeout, **request_kwargs
+                )
+            except requests.RequestException as exc:
+                if attempt >= self.retry_max_attempts:
+                    raise GooglePlacesError(
+                        "Google Places request failed after network retries",
+                        endpoint=endpoint,
+                        attempt=attempt,
+                        retryable=True,
+                        cause=str(exc),
+                    ) from exc
+                time.sleep(self._retry_delay(attempt))
+                continue
+
+            status_code = response.status_code
+            if response.ok:
+                return response
+
+            is_server_error = 500 <= status_code <= 599
+            is_retryable_status = (
+                status_code in retryable_status_codes or is_server_error
+            )
+            is_permanent_client_error = 400 <= status_code <= 499 and status_code != 429
+
+            if is_permanent_client_error:
+                raise GooglePlacesError(
+                    "Google Places request aborted due to permanent client error",
+                    endpoint=endpoint,
+                    attempt=attempt,
+                    status_code=status_code,
+                    retryable=False,
+                    cause=response.text[:300] or None,
+                )
+
+            if is_retryable_status and attempt < self.retry_max_attempts:
+                time.sleep(self._retry_delay(attempt))
+                continue
+
+            raise GooglePlacesError(
+                "Google Places request failed after retries",
+                endpoint=endpoint,
+                attempt=attempt,
+                status_code=status_code,
+                retryable=is_retryable_status,
+                cause=response.text[:300] or None,
+            )
+
+        raise GooglePlacesError(
+            "Google Places request failed without response",
+            endpoint=endpoint,
+            attempt=self.retry_max_attempts,
+            retryable=True,
+        )
 
     def text_search_paginated(
         self, query: str, *, max_results: int, safety_page_limit: int = 60
@@ -61,11 +156,13 @@ class GooglePlacesClient:
             payload = {"textQuery": query, "pageSize": 20}
             if page_token:
                 payload["pageToken"] = page_token
-            response = self.session.post(
-                url, json=payload, headers=headers, timeout=self.timeout
+            response = self._request_with_retry(
+                method="POST",
+                endpoint="/places:searchText",
+                url=url,
+                json=payload,
+                headers=headers,
             )
-            if not response.ok:
-                raise GooglePlacesError(f"Text Search failed ({response.status_code})")
             data = response.json() or {}
             places = data.get("places", []) or []
             total_found_raw += len(places)
@@ -101,11 +198,12 @@ class GooglePlacesClient:
             ]
         )
         headers = {"X-Goog-Api-Key": self.api_key, "X-Goog-FieldMask": fields}
-        response = self.session.get(
-            f"{self.base}/places/{place_id}", headers=headers, timeout=self.timeout
+        response = self._request_with_retry(
+            method="GET",
+            endpoint=f"/places/{place_id}",
+            url=f"{self.base}/places/{place_id}",
+            headers=headers,
         )
-        if not response.ok:
-            raise GooglePlacesError(f"Place details failed ({response.status_code})")
         payload = response.json() or {}
         return PlaceSummary(
             place_id=payload.get("id", place_id),
