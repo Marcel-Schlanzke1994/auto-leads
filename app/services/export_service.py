@@ -122,7 +122,10 @@ def _is_outreach_blocked(lead: Lead) -> bool:
             db.or_(
                 db.and_(
                     Blacklist.entry_type == "email",
-                    Blacklist.value_normalized == email_normalized,
+                    db.or_(
+                        Blacklist.value_normalized == email_normalized,
+                        Blacklist.email == email_normalized,
+                    ),
                 ),
                 db.and_(
                     Blacklist.entry_type == "phone",
@@ -130,7 +133,10 @@ def _is_outreach_blocked(lead: Lead) -> bool:
                 ),
                 db.and_(
                     Blacklist.entry_type == "domain",
-                    Blacklist.value_normalized == domain,
+                    db.or_(
+                        Blacklist.value_normalized == domain,
+                        Blacklist.domain == domain,
+                    ),
                 ),
                 db.and_(
                     Blacklist.entry_type == "company",

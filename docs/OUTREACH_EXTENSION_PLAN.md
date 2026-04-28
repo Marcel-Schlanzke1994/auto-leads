@@ -1,61 +1,87 @@
 # Outreach Extension Plan
 
-## Ist-Struktur
+## Ist-Struktur (Bestandsaufnahme vor Umsetzung)
 
 ### Entry Point
 - `run.py` startet die Flask-App über `app.create_app()`.
-- `app/__init__.py` lädt `.env`, initialisiert Extensions (`db`, `csrf`, `limiter`, `migrate`) und registriert Blueprints (`dashboard`, `leads`, `jobs`, `outreach`, `export`, `api`, `web_compat`).
+- `app/__init__.py` lädt `.env`, initialisiert `db`, `csrf`, `limiter`, `migrate` und registriert Blueprints (`dashboard`, `leads`, `jobs`, `outreach`, `export`, `api`, `web_compat`).
 
-### Models
-- Kernmodell `Lead` in `app/models.py` inkl. Beziehungen zu Outreach-relevanten Modellen.
-- Outreach/Compliance-Modelle in `app/models.py`:
-  - `ContactAttempt`
-  - `OutreachDraft`
-  - `OptOut`
-  - `Blacklist`
-- Auditmodelle (`AuditResult`, `AuditIssue`) als Datenbasis für personalisierte Drafts.
+### Models / Datenbank
+- Kernmodell `Lead` inkl. Beziehungen zu Audit- und Outreach-Objekten in `app/models.py`.
+- Bereits vorhandene Outreach-Modelle in `app/models.py`: `ContactAttempt`, `OutreachDraft`, `OptOut`, `Blacklist`.
+- Bereits vorhandene Migrationen für Outreach/Compliance:
+  - `b1f4d7c9e2aa_add_outreach_and_compliance_models.py`
+  - `d4e8a9f1c2b7_add_notes_and_draft_personalization.py`
+  - `e7b9c2d4f1a6_add_company_fields_to_opt_outs_and_blacklists.py`
 
-### Blueprints
-- `app/routes/leads.py`: Statuswechsel, Draft-Erstellung, ContactAttempts, Callback/Block-Handling.
-- `app/routes/outreach.py`: Outreach-Übersicht (Drafts, Callback-Items, OptOut/Blacklist-Listen).
-- `app/routes/export.py`: CSV-Export (gesamt, high-potential, gefiltert).
-
-### Services
-- `app/services/outreach_draft_service.py`: Block-Checks (OptOut/Blacklist), Draft-Generierung mit Audit-Personalisierung.
-- `app/services/export_service.py`: CSV-Aufbereitung inkl. Outreach-Metadaten (`contact_status`, `outreach_allowed`, `draft_count`, `attempt_count`).
-- `app/services/contact_form_service.py`: Draft-Erzeugung für Kontaktformulare (nur Draft, kein Versand).
+### Routes / Blueprints
+- `app/routes/leads.py`: Lead-Detail, Statuswechsel, Draft-Erzeugung, ContactAttempts, Callback, OptOut/Blacklist.
+- `app/routes/outreach.py`: Outreach-Dashboard (`/outreach`) mit Filtern/Übersichten.
+- `app/routes/export.py`: CSV-Export-Endpunkte.
 
 ### Templates
-- `app/templates/lead_detail.html`: UI für Drafts, Status, ContactAttempts, Callback und Block-Management.
-- `app/templates/outreach.html`: Übersicht zu heißen Leads, Drafts, Rückrufen und Compliance-Einträgen.
+- `app/templates/lead_detail.html`: Kontaktstatus, Draft-UI, ContactAttempts, Callback, Block-Warnung.
+- `app/templates/outreach.html`: Statusübersicht, Hot-Leads, Drafts zur Prüfung, Callback-Liste, OptOut/Blacklist.
+
+### Services
+- `app/services/outreach_draft_service.py`: Draft-Personalisierung + Block-Checks.
+- `app/services/contact_form_service.py`: Kontaktformular-URL-Erkennung + Draft-Text (kein Auto-Submit).
+- `app/services/export_service.py`: CSV-Aufbereitung inkl. Outreach-Feldern.
 
 ### Tests
-- Bestehende Integrationstests in `tests/test_app.py` (u. a. CSV/Outreach-Basisfälle).
-- Erweiterte Tests in `tests/test_outreach_extension.py` für zusätzliche Outreach- und Compliance-Regressionen.
+- `tests/test_outreach_extension.py` deckt Kernanforderungen der Outreach-Erweiterung ab.
+- Weitere Regressionstests in `tests/test_app.py` und Service-Tests.
 
-### Config
-- Zentrale Konfiguration in `config.py` ausschließlich über Umgebungsvariablen.
-- Relevante Schalter: `REQUEST_TIMEOUT`, `PLACES_PROVIDER`, API-Token/Rate-Limit-Konfiguration.
+### Config / .env
+- Konfiguration zentral in `config.py`; Secrets über `.env`.
+- `.env.example` enthält Platzhalter, keine produktiven Tokens.
 
-## Neue/geänderte Dateien
+## Umgesetzte Erweiterungen (additiv, kompatibel)
 
-### Neu
+1. **Blacklist additiv erweitert**
+   - Zusätzliche Felder `email` und `domain` am Modell `Blacklist` ergänzt.
+   - Bestehendes `entry_type`/`value`-Schema bleibt vollständig erhalten (abwärtskompatibel).
+
+2. **Block-Checks robust erweitert**
+   - Draft-Blockierung und CSV-Block-Markierung berücksichtigen sowohl
+     - vorhandene `entry_type/value_normalized`-Einträge als auch
+     - neue direkte Felder `blacklists.email` und `blacklists.domain`.
+
+3. **Lead-Detail Blocking-Workflow ergänzt**
+   - Beim Setzen einer Blacklist über `/leads/<id>/contact-block` werden bei `entry_type=email/domain`
+     zusätzlich die neuen Felder `email` bzw. `domain` gesetzt.
+
+4. **Outreach-Dashboard Query-Warnungen bereinigt**
+   - SQLAlchemy-Subquery-Nutzung auf `select(...)` umgestellt, um SAWarnings zu vermeiden.
+
+## Neu hinzugefügte Dateien
+- `migrations/versions/f2c1a6e9b4d8_add_blacklist_email_domain_columns.py`
+
+## Geänderte Dateien
+- `app/models.py`
+- `app/routes/leads.py`
+- `app/routes/outreach.py`
+- `app/services/outreach_draft_service.py`
+- `app/services/export_service.py`
 - `docs/OUTREACH_EXTENSION_PLAN.md`
-- `tests/test_outreach_extension.py`
+- `README.md`
 
-### Geändert
-- Keine produktiven Python-Dateien geändert.
-
-## DB-Änderungen/Migrationen
-- Für diese Erweiterung wurden **keine neuen DB-Tabellen/-Spalten** eingeführt.
-- Bestehende Outreach-Modelle sind bereits per Migration vorhanden (siehe `migrations/versions/b1f4d7c9e2aa_add_outreach_and_compliance_models.py`).
-- Daher ist **keine zusätzliche Alembic-Migration** erforderlich.
+## Datenbankänderungen
+- **Neue additive Spalten in `blacklists`:**
+  - `email` (`String(255)`, indexiert)
+  - `domain` (`String(255)`, indexiert)
+- Migration: `f2c1a6e9b4d8_add_blacklist_email_domain_columns.py`
 
 ## Start-/Testbefehle
 
 ### Start
 ```bash
 python run.py
+```
+
+### Migration
+```bash
+flask db upgrade
 ```
 
 ### Tests & Lint
@@ -65,7 +91,8 @@ black --check .
 flake8
 ```
 
-## Compliance-Hinweis
-- Outreach-Funktionalität ist auf **Draft-Erstellung und manuelle Freigabe** ausgelegt.
-- Es findet **keine automatische Massenwerbung** und kein automatischer Bulk-Versand statt.
-- Contact-Form-Drafts werden explizit als `auto_send: false` gespeichert und müssen manuell geprüft werden.
+## Rechtliche Schutzlogik (verbindlich)
+- Outreach erzeugt **nur Entwürfe (Drafts)**.
+- **Kein automatischer SMTP-Versand** und keine automatische Massenwerbung.
+- Kontaktformular-Unterstützung ist vorbereitend (URL-Erkennung + Draft), nicht blindes Auto-Submit.
+- OptOut/Blacklist blockiert die Draft-Erzeugung und wird im Lead-Detail klar als „Kontakt gesperrt“ angezeigt.

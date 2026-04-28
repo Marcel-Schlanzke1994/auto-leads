@@ -125,6 +125,39 @@ def test_set_contact_block_adds_company_opt_out_and_blacklist(client, app):
         assert blacklist.company_name == "Firmenname GmbH"
 
 
+def test_set_contact_block_persists_blacklist_email_and_domain_fields(client, app):
+    with app.app_context():
+        lead = _create_lead(
+            company_name="Mail Domain GmbH",
+            website="https://mail-domain.example",
+            email="kontakt@mail-domain.example",
+            email_normalized="kontakt@mail-domain.example",
+        )
+        db.session.add(lead)
+        db.session.commit()
+        lead_id = lead.id
+
+    response_email = client.post(
+        f"/leads/{lead_id}/contact-block",
+        data={"block_type": "blacklist", "entry_type": "email"},
+    )
+    assert response_email.status_code == 302
+
+    response_domain = client.post(
+        f"/leads/{lead_id}/contact-block",
+        data={"block_type": "blacklist", "entry_type": "domain"},
+    )
+    assert response_domain.status_code == 302
+
+    with app.app_context():
+        email_entry = Blacklist.query.filter_by(entry_type="email").first()
+        domain_entry = Blacklist.query.filter_by(entry_type="domain").first()
+        assert email_entry is not None
+        assert email_entry.email == "kontakt@mail-domain.example"
+        assert domain_entry is not None
+        assert domain_entry.domain == "mail-domain.example"
+
+
 def test_contact_attempt_creation_persists_required_fields(app):
     with app.app_context():
         lead = _create_lead()
