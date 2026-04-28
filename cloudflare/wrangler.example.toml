@@ -1,0 +1,12 @@
+name = "auto-leads-worker-prototype"
+main = "src/index.ts"
+compatibility_date = "2026-04-28"
+
+# Optional and non-productive defaults only.
+workers_dev = true
+
+[vars]
+APP_ENV = "development"
+
+# Never commit real secrets or production identifiers.
+# Use: wrangler secret put <KEY>
