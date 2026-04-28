@@ -188,6 +188,61 @@ def test_csv_export_contains_outreach_fields(client, app):
     assert "attempt_count" in header
 
 
+def test_csv_export_marks_outreach_blocked_for_company_opt_out_and_blacklist(
+    client, app
+):
+    with app.app_context():
+        db.session.add(
+            _create_lead(
+                company_name="OptOut AG",
+                website="https://optout-ag.example",
+                email="kontakt@optout-ag.example",
+                email_normalized="kontakt@optout-ag.example",
+            )
+        )
+        db.session.add(
+            _create_lead(
+                company_name="Blacklist GmbH",
+                website="https://blacklist-gmbh.example",
+                email="kontakt@blacklist-gmbh.example",
+                email_normalized="kontakt@blacklist-gmbh.example",
+            )
+        )
+        db.session.flush()
+        db.session.add(
+            OptOut(
+                channel="all",
+                company_name="OptOut AG",
+                company_name_normalized="optout",
+            )
+        )
+        db.session.add(
+            Blacklist(
+                entry_type="company",
+                value="blacklist",
+                value_normalized="blacklist",
+                company_name="Blacklist GmbH",
+                active=True,
+            )
+        )
+        db.session.commit()
+
+    response = client.get("/export/csv")
+
+    assert response.status_code == 200
+    rows = response.get_data(as_text=True).splitlines()
+    header = rows[0].split(",")
+    company_idx = header.index("company_name")
+    outreach_allowed_idx = header.index("outreach_allowed")
+
+    data = {
+        row.split(",")[company_idx]: row.split(",")[outreach_allowed_idx]
+        for row in rows[1:]
+    }
+    assert data["OptOut AG"] == "False"
+    assert data["Blacklist GmbH"] == "False"
+
+
 def test_draft_generator_uses_audit_data(app):
     with app.app_context():
         lead = _create_lead(company_name="Audit GmbH")
