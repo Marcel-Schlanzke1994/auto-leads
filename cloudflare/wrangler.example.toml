@@ -9,5 +9,15 @@ APP_ENV = "development"
 SERVICE_NAME = "auto-leads-cloudflare-foundation"
 SERVICE_VERSION = "0.1.0"
 
+[[durable_objects.bindings]]
+name = "OUTREACH_RATE_LIMITER"
+class_name = "OutreachRateLimiter"
+
+# Example-only migration for local/prototype use.
+# Use a new tag/class list in your own local wrangler.toml when evolving schema.
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["OutreachRateLimiter"]
+
 # Create local wrangler.toml for real usage and keep it out of git.
 # Secrets must be provided via `wrangler secret put <KEY>`.
