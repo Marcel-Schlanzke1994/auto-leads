@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from auto_leads import create_app
+from app import create_app
 
 app = create_app()
 

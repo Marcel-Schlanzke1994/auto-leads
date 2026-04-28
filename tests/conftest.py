@@ -5,7 +5,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import pytest
 
-from auto_leads import create_app  # noqa: E402
+from app import create_app  # noqa: E402
 from auto_leads.extensions import db  # noqa: E402
 
 

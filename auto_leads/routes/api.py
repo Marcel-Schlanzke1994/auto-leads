@@ -3,8 +3,8 @@ from __future__ import annotations
 from flask import Blueprint, current_app, jsonify, request
 
 from auto_leads.extensions import db, limiter
-from auto_leads.models import Lead, SearchJob
-from auto_leads.services.search_runner import start_search_job
+from app.models import Lead, SearchJob
+from app.services.search_runner_service import start_search_job
 
 api_bp = Blueprint("api", __name__, url_prefix="/api")
 

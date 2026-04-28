@@ -1,10 +1,10 @@
 from types import SimpleNamespace
 
 from auto_leads.extensions import db
-from auto_leads.models import Lead, SearchJob
-from auto_leads.services.dedupe import is_duplicate_candidate
-from auto_leads.services.scoring import calculate_lead_score
-from auto_leads.services.search_runner import (
+from app.models import Lead, SearchJob
+from app.services.duplicate_service import is_duplicate_candidate
+from app.services.lead_score_service import calculate_lead_score
+from app.services.search_runner_service import (
     _create_places_client,
     _extract_city,
     _run_search_job,
@@ -274,11 +274,11 @@ def test_search_job_reaches_target_and_paginates(app, monkeypatch):
             return FakePlace(idx)
 
     monkeypatch.setattr(
-        "auto_leads.services.search_runner._create_places_client",
+        "app.services.search_runner_service._create_places_client",
         lambda _app: (FakeClient(), "google_places", None),
     )
     monkeypatch.setattr(
-        "auto_leads.services.search_runner.audit_website",
+        "app.services.search_runner_service.audit_website",
         lambda website, timeout: SimpleNamespace(
             site_title="T",
             meta_description="D",

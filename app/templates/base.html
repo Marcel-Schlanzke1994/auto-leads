@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{% block title %}Auto Leads{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="container topbar-inner">
+        <h1>Auto Leads</h1>
+        <nav>
+          <a href="{{ url_for('dashboard.dashboard') }}">Dashboard</a>
+          <a href="{{ url_for('leads.leads_list') }}">Leads</a>
+          <a href="{{ url_for('jobs.list_jobs') }}">Jobs</a>
+          <a href="{{ url_for('export.export_csv') }}">CSV Export</a>
+        </nav>
+      </div>
+    </header>
+    <main class="container">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+      <ul class="flash-list">
+        {% for category, msg in messages %}
+        <li class="flash {{ category }}">{{ msg }}</li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+      {% endwith %}
+      {% block content %}{% endblock %}
+    </main>
+  </body>
+</html>

@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+{% block title %}Lead {{ lead.company_name }}{% endblock %}
+{% block content %}
+<section class="panel">
+  <h2>{{ lead.company_name }}</h2>
+  <p><strong>Adresse:</strong> {{ lead.address or '-' }}</p>
+  <p><strong>Website:</strong> {% if lead.website %}<a href="{{ lead.website }}" target="_blank" rel="noopener noreferrer">{{ lead.website }}</a>{% else %}-{% endif %}</p>
+  <p><strong>E-Mail:</strong> {{ lead.email or '-' }} | <strong>Telefon:</strong> {{ lead.phone or '-' }}</p>
+  <p><strong>Inhaber/GF:</strong> {{ lead.owner_name or '-' }} | <strong>Rechtsform:</strong> {{ lead.legal_form or '-' }}</p>
+  <p><strong>Google Sterne:</strong> {{ lead.google_rating or '-' }} | <strong>Anzahl Bewertungen:</strong> {{ lead.review_count or '-' }}</p>
+  <p><strong>Kategorien:</strong> {{ lead.categories or '-' }}</p>
+  <p><strong>Score:</strong> {{ lead.score }}</p>
+  <pre>{{ lead.score_reasons }}</pre>
+</section>
+
+<section class="panel split">
+  <form method="post" action="{{ url_for('leads.update_status', lead_id=lead.id) }}">
+    {{ status_form.hidden_tag() }}
+    {{ status_form.status() }}
+    {{ status_form.submit(class_='btn') }}
+  </form>
+  <form method="post" action="{{ url_for('leads.rerun_audit', lead_id=lead.id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+    <button class="btn" type="submit">Audit erneut starten</button>
+  </form>
+</section>
+
+<section class="panel">
+  <h3>Audit & Parser Hinweise</h3>
+  <p><strong>Impressum gefunden:</strong> {{ 'Ja' if lead.impressum_found else 'Nein' }}</p>
+  <p><strong>Seitentitel:</strong> {{ lead.site_title or '-' }}</p>
+  <p><strong>Meta Description:</strong> {{ lead.meta_description or '-' }}</p>
+  <p><strong>H1 vorhanden:</strong> {{ 'Ja' if lead.has_h1 else 'Nein' }} | <strong>CTA:</strong> {{ 'Ja' if lead.has_cta else 'Nein' }}</p>
+  <p><strong>Page Load:</strong> {{ lead.page_load_ms or '-' }} ms</p>
+  <h4>Geprüfte Seiten</h4>
+  <pre>{{ lead.checked_pages or '-' }}</pre>
+  <h4>Parser Notes</h4>
+  <pre>{{ lead.parser_notes or '-' }}</pre>
+  <h4>Audit Notes</h4>
+  <pre>{{ lead.audit_notes or '-' }}</pre>
+</section>
+{% endblock %}
