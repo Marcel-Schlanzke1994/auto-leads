@@ -1,7 +1,8 @@
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
 from app.extensions import db
-from app.models import Lead, SearchJob
+from app.models import Blacklist, ContactAttempt, Lead, OptOut, OutreachDraft, SearchJob
 from app.services.duplicate_service import is_duplicate
 from app.services.lead_score_service import calculate_lead_score
 from app.services.search_runner_service import (
@@ -277,6 +278,70 @@ def test_csv_export_contains_new_fields(client, app):
     assert "google_rating" in text
     assert "review_count" in text
     assert "score_reasons" in text
+
+
+def test_csv_export_includes_contact_metadata_fields(client, app):
+    callback_at = datetime.now(UTC) + timedelta(days=1)
+    last_attempt_at = datetime.now(UTC) - timedelta(days=1)
+    with app.app_context():
+        lead = Lead(
+            company_name="Kontakt GmbH",
+            source_query="q",
+            website="https://kontakt.de",
+            email="hello@kontakt.de",
+            email_normalized="hello@kontakt.de",
+            phone="+49 1234567",
+            phone_normalized="+491234567",
+        )
+        db.session.add(lead)
+        db.session.flush()
+        db.session.add_all(
+            [
+                OutreachDraft(
+                    lead_id=lead.id,
+                    channel="email",
+                    body="Draft body",
+                ),
+                ContactAttempt(
+                    lead_id=lead.id,
+                    channel="email",
+                    status="sent",
+                    attempted_at=last_attempt_at,
+                ),
+                ContactAttempt(
+                    lead_id=lead.id,
+                    channel="phone",
+                    status="callback_planned",
+                    attempted_at=callback_at,
+                ),
+                OptOut(
+                    channel="email",
+                    email="hello@kontakt.de",
+                    email_normalized="hello@kontakt.de",
+                ),
+                Blacklist(
+                    entry_type="domain",
+                    value="kontakt.de",
+                    value_normalized="kontakt.de",
+                    active=True,
+                ),
+            ]
+        )
+        db.session.commit()
+
+    resp = client.get("/export/csv")
+    assert resp.status_code == 200
+    lines = resp.get_data(as_text=True).strip().splitlines()
+    header = lines[0].split(",")
+    data = lines[1].split(",")
+    row = dict(zip(header, data, strict=False))
+
+    assert row["contact_status"] == "blocked"
+    assert row["last_contact_at"].startswith(callback_at.date().isoformat())
+    assert row["next_callback_at"].startswith(callback_at.date().isoformat())
+    assert row["outreach_allowed"] == "False"
+    assert row["draft_count"] == "1"
+    assert row["attempt_count"] == "2"
 
 
 def test_google_provider_requires_api_key(app):
