@@ -111,12 +111,6 @@ def is_duplicate(
         return True
 
     if (
-        normalized_name
-        and Lead.query.filter_by(normalized_company_name=normalized_name).first()
-    ):
-        return True
-
-    if (
         normalized_phone
         and Lead.query.filter_by(phone_normalized=normalized_phone).first()
     ):
@@ -134,5 +128,13 @@ def is_duplicate(
             city_normalized=normalized_city,
         ).first():
             return True
+
+    # Name-only matches are intentionally treated as a weak signal and
+    # therefore are not enough to classify a lead as a hard duplicate.
+    if (
+        normalized_name
+        and Lead.query.filter_by(normalized_company_name=normalized_name).first()
+    ):
+        return False
 
     return False

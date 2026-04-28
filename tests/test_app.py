@@ -76,7 +76,7 @@ def test_duplicate_filter(app):
             phone=None,
             email=None,
         )
-        assert is_duplicate(
+        assert not is_duplicate(
             place_id=None,
             company_name="MUSTER GMBH",
             city=None,
