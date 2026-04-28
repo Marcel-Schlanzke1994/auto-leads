@@ -1,12 +1,13 @@
-name = "auto-leads-worker-prototype"
+# Example config only. Do not commit real IDs, tokens, or domains.
+name = "auto-leads-worker"
 main = "src/index.ts"
 compatibility_date = "2026-04-28"
-
-# Optional and non-productive defaults only.
 workers_dev = true
 
 [vars]
 APP_ENV = "development"
+SERVICE_NAME = "auto-leads-cloudflare-foundation"
+SERVICE_VERSION = "0.1.0"
 
-# Never commit real secrets or production identifiers.
-# Use: wrangler secret put <KEY>
+# Create local wrangler.toml for real usage and keep it out of git.
+# Secrets must be provided via `wrangler secret put <KEY>`.

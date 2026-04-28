@@ -4,3 +4,9 @@ instance/
 .venv/
 .env
 *.pyc
+.wrangler/
+cloudflare/.dev.vars
+cloudflare/wrangler.toml
+node_modules/
+dist/
+build/
