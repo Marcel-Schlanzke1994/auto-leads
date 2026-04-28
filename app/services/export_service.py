@@ -9,6 +9,7 @@ from flask import Response
 
 from app.extensions import db
 from app.models import AuditIssue, AuditResult, Blacklist, Lead, OptOut
+from app.services.duplicate_service import normalize_company_name
 
 
 CSV_HEADERS = [
@@ -87,6 +88,7 @@ def _is_outreach_blocked(lead: Lead) -> bool:
     email_normalized = _normalize_email(lead.email)
     phone_normalized = _normalize_phone(lead.phone)
     domain = _extract_domain(lead.website)
+    normalized_company = normalize_company_name(lead.company_name)
 
     opt_out_exists = (
         db.session.query(OptOut.id)
@@ -101,6 +103,10 @@ def _is_outreach_blocked(lead: Lead) -> bool:
                     OptOut.phone_normalized == phone_normalized,
                 ),
                 db.and_(OptOut.domain.isnot(None), OptOut.domain == domain),
+                db.and_(
+                    OptOut.company_name_normalized.isnot(None),
+                    OptOut.company_name_normalized == normalized_company,
+                ),
             )
         )
         .first()
@@ -125,6 +131,10 @@ def _is_outreach_blocked(lead: Lead) -> bool:
                 db.and_(
                     Blacklist.entry_type == "domain",
                     Blacklist.value_normalized == domain,
+                ),
+                db.and_(
+                    Blacklist.entry_type == "company",
+                    Blacklist.value_normalized == normalized_company,
                 ),
             )
         )
