@@ -169,6 +169,8 @@ Die Cloudflare-Schicht ist aktuell eine **optionale Vorbereitung** und hat keine
 
 Details: `docs/CLOUDFLARE_FOUNDATION.md`
 
+Optionaler Wrangler-Dev-Flow (ohne Deployment): `cloudflare/README.md` und `docs/WRANGLER_SETUP.md`.
+
 Sandbox-/SSRF-Leitplanken für externe Website-Analysen: `docs/SANDBOX_POLICY.md`
 
 ```bash

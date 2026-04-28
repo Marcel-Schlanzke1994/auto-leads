@@ -1,41 +1,64 @@
-# Cloudflare Optional Integration (Foundation + Durable Objects Prototype)
+# Cloudflare Optional Integration (Wrangler Finalization)
 
-Dieser Ordner enthält eine **optionale** Cloudflare-Foundation für spätere Edge-Funktionen.
+Dieser Ordner enthält eine **optionale** Cloudflare-Worker-Entwicklungsumgebung.
+Das lokale Flask-System bleibt führend und unverändert lauffähig.
 
 ## Wichtige Leitplanken
 
 - Kein Einfluss auf den lokalen Flask-Betrieb.
 - Keine Pflichtabhängigkeit auf Cloudflare.
 - Keine echten Secrets/IDs/Tokens im Repository.
-- Kein E-Mail-Versand, kein Scraping, kein Lead-Datenzugriff.
+- Kein E-Mail-Versand, kein Bulk-Send, kein Auto-Send.
 - Kein Zugriff auf lokale DB aus dem Worker.
-- Keine personenbezogenen Logs (keine E-Mail-Adressen, Lead-Inhalte, Draft-Texte).
+- Kein Scraping/Crawling über den Worker.
 
-## Worker Best Practices (angewendet)
-
-- Typed Contracts (`src/types.ts`) für Env, Request/Response-Typen.
-- Zentrale Response-Helper (`src/responses.ts`) mit Security-Headern.
-- Zentrales Error-Handling (`src/errors.ts`) ohne Stacktraces im Response-Body.
-- Defensive Request-Validierung für `POST /rate-limit/check` (Methode, Content-Type, Payload-Größe, Feldgrenzen).
-- Optionale DO-Bindings: Worker bleibt lauffähig, Cloudflare bleibt optional.
-
-## Endpunkte
+## Endpunkte (bestehend)
 
 - `GET /health`
 - `GET /version`
 - `POST /rate-limit/check`
 
-### Rate-Limit Hinweis
-
-`key` sollte als **Hash/technische ID** übergeben werden (kein Klartext mit PII wie E-Mail-Adressen).
-
-## Lokale Nutzung (optional)
+## Setup (optional, lokal)
 
 ```bash
 cd cloudflare
-npm install
+npm ci
+cp .dev.vars.example .dev.vars
+cp wrangler.example.toml wrangler.toml
 npm run dev
 npm run typecheck
 ```
 
-> Kein Deployment in dieser Phase.
+## Warum `wrangler.toml` ignoriert wird
+
+`wrangler.toml` enthält projektspezifische lokale Werte (z. B. IDs/Routes/Env-Anpassungen) und bleibt deshalb **gitignored**.
+Bitte nur `wrangler.example.toml` als sichere Vorlage versionieren.
+
+## Secrets sicher setzen
+
+Echte Secrets niemals in `.dev.vars.example`, `wrangler.example.toml` oder Git-Commits ablegen.
+Für Cloudflare-Secrets lokal/remote:
+
+```bash
+npx wrangler secret put SECRET_NAME
+```
+
+## Commit-Schutz
+
+Nicht committen:
+
+- `cloudflare/.dev.vars`
+- `cloudflare/wrangler.toml`
+
+## Safe Local Testing
+
+- `npm run dev` startet lokale Worker-Entwicklung.
+- `npm run typecheck` prüft TS-Typen CI-kompatibel.
+- `npm run dry-run` ist optional und führt **kein echtes Deployment** aus.
+
+## Grenzen / Non-Goals
+
+- Kein produktives Deployment in dieser Phase.
+- Kein automatischer E-Mail-Versand.
+- Kein Bulk-Send.
+- Kein DB-Zugriff aus Worker-Kontext.

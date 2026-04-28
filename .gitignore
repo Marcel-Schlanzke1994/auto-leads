@@ -10,3 +10,7 @@ cloudflare/wrangler.toml
 node_modules/
 dist/
 build/
+cloudflare/.wrangler/
+cloudflare/node_modules/
+cloudflare/dist/
+cloudflare/build/
