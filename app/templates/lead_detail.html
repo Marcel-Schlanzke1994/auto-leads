@@ -9,8 +9,7 @@
   <p><strong>Inhaber/GF:</strong> {{ lead.owner_name or '-' }} | <strong>Rechtsform:</strong> {{ lead.legal_form or '-' }}</p>
   <p><strong>Google Sterne:</strong> {{ lead.google_rating or '-' }} | <strong>Anzahl Bewertungen:</strong> {{ lead.review_count or '-' }}</p>
   <p><strong>Kategorien:</strong> {{ lead.categories or '-' }}</p>
-  <p><strong>Score:</strong> {{ lead.score }}</p>
-  <pre>{{ lead.score_reasons }}</pre>
+  <p><strong>Lead Potential Score:</strong> {{ lead.score }}</p>
 </section>
 
 <section class="panel split">
@@ -26,17 +25,88 @@
 </section>
 
 <section class="panel">
-  <h3>Audit & Parser Hinweise</h3>
-  <p><strong>Impressum gefunden:</strong> {{ 'Ja' if lead.impressum_found else 'Nein' }}</p>
-  <p><strong>Seitentitel:</strong> {{ lead.site_title or '-' }}</p>
-  <p><strong>Meta Description:</strong> {{ lead.meta_description or '-' }}</p>
-  <p><strong>H1 vorhanden:</strong> {{ 'Ja' if lead.has_h1 else 'Nein' }} | <strong>CTA:</strong> {{ 'Ja' if lead.has_cta else 'Nein' }}</p>
-  <p><strong>Page Load:</strong> {{ lead.page_load_ms or '-' }} ms</p>
-  <h4>Geprüfte Seiten</h4>
-  <pre>{{ lead.checked_pages or '-' }}</pre>
-  <h4>Parser Notes</h4>
-  <pre>{{ lead.parser_notes or '-' }}</pre>
-  <h4>Audit Notes</h4>
-  <pre>{{ lead.audit_notes or '-' }}</pre>
+  <h3>Audit-Blöcke</h3>
+  {% if latest_audit %}
+  <p><strong>SEO-Score:</strong> {{ latest_audit.score_seo or '-' }} | <strong>Overall:</strong> {{ latest_audit.score_overall or '-' }}</p>
+  <p><strong>CWV:</strong> LCP {{ latest_audit.cwv_lcp_ms or '-' }} ms, INP {{ latest_audit.cwv_inp_ms or '-' }} ms, CLS {{ latest_audit.cwv_cls or '-' }}</p>
+  <p>
+    <strong>Issues:</strong>
+    kritisch {{ issue_counts['critical'] }},
+    warning {{ issue_counts['warning'] }},
+    opportunity {{ issue_counts['opportunity'] }},
+    quick wins {{ issue_counts['quick_win'] }}
+  </p>
+  {% else %}
+  <p>Noch kein detailliertes Audit vorhanden.</p>
+  {% endif %}
+</section>
+
+<section class="panel">
+  <h3>Quick Wins</h3>
+  <ul>
+    {% for item in quick_wins %}
+    <li>{{ item }}</li>
+    {% else %}
+    <li>Keine Quick Wins erkannt.</li>
+    {% endfor %}
+  </ul>
+</section>
+
+<section class="panel">
+  <h3>Top Sales Arguments</h3>
+  <ol>
+    {% for arg in top_sales_arguments %}
+    <li>{{ arg }}</li>
+    {% else %}
+    <li>Keine Sales Arguments vorhanden.</li>
+    {% endfor %}
+  </ol>
+</section>
+
+<section class="panel">
+  <h3>Score-Rationale</h3>
+  {% if score_details %}
+  <p><strong>Subscores:</strong>
+    Reputation {{ score_details.subscores.reputation }},
+    Website {{ score_details.subscores.website_presence }},
+    Kontakt {{ score_details.subscores.contact }},
+    Content {{ score_details.subscores.content }},
+    Technik {{ score_details.subscores.technical }}
+  </p>
+  <details>
+    <summary>Ausgelöste Regeln</summary>
+    <ul>
+      {% for reason in score_details.reason_lines %}
+      <li>{{ reason }}</li>
+      {% endfor %}
+    </ul>
+  </details>
+  {% else %}
+  <pre>{{ lead.score_reasons or '-' }}</pre>
+  {% endif %}
+</section>
+
+<section class="panel">
+  <h3>Einklappbare Rohdaten</h3>
+  <details>
+    <summary>Lead Rohdaten</summary>
+    <pre>{{ lead.raw_place_json or '-' }}</pre>
+  </details>
+  {% if latest_audit %}
+  <details>
+    <summary>Audit raw_audit_json</summary>
+    <pre>{{ latest_audit.raw_audit_json or '-' }}</pre>
+  </details>
+  <details>
+    <summary>Audit raw_pagespeed_json</summary>
+    <pre>{{ latest_audit.raw_pagespeed_json or '-' }}</pre>
+  </details>
+  {% endif %}
+  <details>
+    <summary>Parser/Audit Notes</summary>
+    <pre>{{ lead.parser_notes or '-' }}</pre>
+    <pre>{{ lead.audit_notes or '-' }}</pre>
+    <pre>{{ lead.checked_pages or '-' }}</pre>
+  </details>
 </section>
 {% endblock %}
