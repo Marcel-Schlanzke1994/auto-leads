@@ -12,7 +12,7 @@ from flask import (
 
 from app.models import Lead
 from app.services.lead_score_service import calculate_lead_score
-from app.services.website_audit_service import audit_website
+from app.services.website_audit_service import audit_website, persist_audit_result
 from auto_leads.extensions import db
 from auto_leads.forms import StatusForm
 
@@ -88,6 +88,7 @@ def rerun_audit(lead_id: int):
             lead.owner_name = audit.owner_name
         if audit.legal_form:
             lead.legal_form = audit.legal_form
+        persist_audit_result(lead, audit)
         lead.score, reasons = calculate_lead_score(lead)
         lead.score_reasons = "\n".join(reasons)
         db.session.commit()

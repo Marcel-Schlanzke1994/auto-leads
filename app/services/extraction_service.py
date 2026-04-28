@@ -1,15 +1,26 @@
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 
 from app.services.google_places_service import PlaceSummary
 
 EMAIL_RE = re.compile(r"[\w.\-+%]+@[\w\-]+\.[\w\-.]+")
 PHONE_RE = re.compile(r"\+?\d[\d\s/().-]{6,}\d")
-LEGAL_FORM_RE = re.compile(r"\b(GmbH|UG|e\.K\.|GbR|OHG|AG|KG|PartG)\b", re.IGNORECASE)
+LEGAL_FORM_RE = re.compile(
+    r"\b(GmbH|UG|e\.K\.|GbR|OHG|AG|KG|PartG|Gbr|UG \(haftungsbeschränkt\))\b",
+    re.IGNORECASE,
+)
 OWNER_RE = re.compile(
     r"(?:Inhaber|Gesch[aä]ftsf[uü]hrer|Vertretungsberechtigt(?:e Person)?)"
     r"\s*:?\s*([^\n|<]{3,120})",
+    re.IGNORECASE,
+)
+ADDRESS_RE = re.compile(
+    r"\b([A-ZÄÖÜ][\wÄÖÜäöüß\-. ]+\s\d+[a-zA-Z]?,\s?\d{4,5}\s[A-ZÄÖÜ][\wÄÖÜäöüß\-. ]+)\b"
+)
+OPENING_HOURS_RE = re.compile(
+    r"(Mo(?:ntag)?\s*[\-–:]\s*Fr(?:eitag)?[^\n]{5,80}|opening\s*hours[^\n]{2,80})",
     re.IGNORECASE,
 )
 
@@ -65,14 +76,52 @@ BUSINESS_HINT_TYPES = {
 }
 
 
-def extract_contact_details(
-    text: str,
-) -> tuple[str | None, str | None, str | None, str | None]:
+@dataclass(slots=True)
+class ExtractionProfile:
+    email: str | None
+    phone: str | None
+    owner_name: str | None
+    legal_form: str | None
+    address: str | None
+    opening_hours: str | None
+    social_links: list[str]
+    whatsapp_links: list[str]
+    booking_links: list[str]
+
+
+def extract_company_profile(text: str) -> ExtractionProfile:
     email = _first_match(EMAIL_RE, text)
     phone = _first_match(PHONE_RE, text)
     owner = _extract_owner(text)
     legal_form = _first_match(LEGAL_FORM_RE, text)
-    return email, phone, owner, legal_form
+    address = _first_match(ADDRESS_RE, text)
+    opening_hours = _first_match(OPENING_HOURS_RE, text)
+    socials = _extract_links(
+        text,
+        ["facebook.com", "instagram.com", "linkedin.com", "tiktok.com", "youtube.com"],
+    )
+    whatsapp = _extract_links(text, ["wa.me", "whatsapp.com"])
+    booking = _extract_links(
+        text, ["booking", "book", "termin", "reservierung", "calendly.com"]
+    )
+    return ExtractionProfile(
+        email=email,
+        phone=phone,
+        owner_name=owner,
+        legal_form=legal_form,
+        address=address,
+        opening_hours=opening_hours,
+        social_links=socials,
+        whatsapp_links=whatsapp,
+        booking_links=booking,
+    )
+
+
+def extract_contact_details(
+    text: str,
+) -> tuple[str | None, str | None, str | None, str | None]:
+    profile = extract_company_profile(text)
+    return profile.email, profile.phone, profile.owner_name, profile.legal_form
 
 
 def extract_city(
@@ -144,3 +193,17 @@ def _extract_owner(text: str) -> str | None:
     if not match:
         return None
     return re.sub(r"\s+", " ", match.group(1)).strip(" :;,-")[:120]
+
+
+def _extract_links(text: str, keywords: list[str]) -> list[str]:
+    links: list[str] = []
+    for token in text.split():
+        if "http" not in token.lower():
+            continue
+        cleaned = token.strip("()[]<>,.;\"'")
+        if (
+            any(keyword in cleaned.lower() for keyword in keywords)
+            and cleaned not in links
+        ):
+            links.append(cleaned)
+    return links
