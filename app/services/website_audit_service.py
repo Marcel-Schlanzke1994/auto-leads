@@ -15,6 +15,7 @@ from app.services.extraction_service import extract_company_profile
 from app.services.pagespeed_service import analyze_pagespeed, extract_page_load_ms
 from app.services.seo_check_service import CheckResult, analyze_seo, run_all_seo_checks
 from app.services.website_fetcher import fetch_website
+from app.services.web_perf import analyze_web_perf
 from app.extensions import db
 
 
@@ -41,6 +42,7 @@ class AuditResult:
     quick_wins: list[dict]
     top_sales_arguments: list[str]
     raw_pagespeed: dict
+    web_perf_result: dict | None = None
 
 
 def audit_website(url: str, timeout: float) -> AuditResult:
@@ -55,6 +57,7 @@ def audit_website(url: str, timeout: float) -> AuditResult:
     )
     profile = extract_company_profile(combined_text)
     page_speed = analyze_pagespeed(fetch.url, fetch, timeout)
+    web_perf = analyze_web_perf(fetch, page_speed)
     seo_checks = run_all_seo_checks(
         fetch.body, _checks_with_link_status(crawl), urlparse(fetch.url).hostname or ""
     )
@@ -108,10 +111,12 @@ def audit_website(url: str, timeout: float) -> AuditResult:
         quick_wins=quick_wins,
         top_sales_arguments=sales_arguments,
         raw_pagespeed=page_speed,
+        web_perf_result=web_perf.to_dict(),
     )
 
 
 def persist_audit_result(lead: Lead, audit: AuditResult) -> AuditResultModel:
+    web_perf_result = getattr(audit, "web_perf_result", None) or {}
     detail = AuditResultModel(
         lead=lead,
         status="done",
@@ -122,8 +127,10 @@ def persist_audit_result(lead: Lead, audit: AuditResult) -> AuditResultModel:
         score_seo=audit.raw_pagespeed.get("seo_score"),
         score_content=70.0,
         score_trust=100.0 if audit.impressum_found else 45.0,
-        cwv_lcp_ms=audit.raw_pagespeed.get("lcp_ms"),
-        cwv_fcp_ms=audit.raw_pagespeed.get("fcp_ms"),
+        cwv_lcp_ms=web_perf_result.get("lcp_ms") or audit.raw_pagespeed.get("lcp_ms"),
+        cwv_inp_ms=web_perf_result.get("inp_ms"),
+        cwv_cls=web_perf_result.get("cls"),
+        cwv_fcp_ms=web_perf_result.get("fcp_ms") or audit.raw_pagespeed.get("fcp_ms"),
         cwv_ttfb_ms=audit.raw_pagespeed.get("ttfb_ms"),
         seo_title=audit.site_title,
         seo_meta_description=audit.meta_description,
@@ -150,8 +157,14 @@ def persist_audit_result(lead: Lead, audit: AuditResult) -> AuditResultModel:
             "quick_wins": audit.quick_wins,
             "top_sales_arguments": audit.top_sales_arguments,
         },
-        raw_pagespeed_json=audit.raw_pagespeed,
-        meta_json={"parser_notes": audit.parser_notes},
+        raw_pagespeed_json={
+            **audit.raw_pagespeed,
+            "web_perf": web_perf_result,
+        },
+        meta_json={
+            "parser_notes": audit.parser_notes,
+            "web_perf": web_perf_result,
+        },
     )
     db.session.add(detail)
 

@@ -65,3 +65,34 @@ def test_rule_explanations_are_machine_readable_json_payload(app):
 
     assert isinstance(decoded["rules"], list)
     assert {"rule_id", "weight", "finding", "triggered"}.issubset(decoded["rules"][0])
+
+
+def test_web_perf_rules_are_additive_and_score_capped():
+    from datetime import UTC, datetime
+
+    from app.models import AuditResult
+
+    lead = Lead(
+        company_name="Perf GmbH",
+        source_query="q",
+        website="https://example.org",
+        mobile_signals=False,
+    )
+    audit = AuditResult(
+        created_at=datetime.now(UTC),
+        raw_pagespeed_json={
+            "web_perf": {
+                "performance_score": 40,
+                "uses_compression": False,
+                "render_blocking_risk": "high",
+                "image_optimization_risk": "high",
+                "mobile_performance_risk": "high",
+            }
+        },
+    )
+    lead.audit_results = [audit]
+
+    details = calculate_lead_score_details(lead)
+    ids = {rule["rule_id"] for rule in details["rules"] if rule["triggered"]}
+    assert "WEB_PERF_SCORE_LOW" in ids
+    assert 0 <= details["lead_potential_score"] <= 100

@@ -57,6 +57,10 @@ def analyze_pagespeed(url: str, fetch_result: FetchResult, timeout: float) -> di
                     "fcp_ms": _numeric_audit(audits, "first-contentful-paint"),
                     "lcp_ms": _numeric_audit(audits, "largest-contentful-paint"),
                     "ttfb_ms": _numeric_audit(audits, "server-response-time"),
+                    "cls": _numeric_float_audit(audits, "cumulative-layout-shift"),
+                    "inp_ms": _numeric_audit(audits, "interactive"),
+                    "tbt_ms": _numeric_audit(audits, "total-blocking-time"),
+                    "tti_ms": _numeric_audit(audits, "interactive"),
                     "raw": payload,
                     "error_code": None,
                     "error_message": None,
@@ -194,3 +198,11 @@ def _log_pagespeed_fallback(
         retries,
         retry_count,
     )
+
+
+def _numeric_float_audit(audits: dict, key: str) -> float | None:
+    entry = audits.get(key) or {}
+    value = entry.get("numericValue")
+    if value is None:
+        return None
+    return round(float(value), 3)

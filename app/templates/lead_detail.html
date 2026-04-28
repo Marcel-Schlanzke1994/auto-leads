@@ -181,6 +181,21 @@
 </section>
 
 <section class="panel">
+  <h3>Web Performance</h3>
+  {% set web_perf = (latest_audit.raw_pagespeed_json.web_perf if latest_audit and latest_audit.raw_pagespeed_json and latest_audit.raw_pagespeed_json.web_perf else None) %}
+  {% if web_perf %}
+  <p><strong>Score:</strong> {{ web_perf.performance_score or '-' }} | <strong>Quelle:</strong> {{ web_perf.source }}</p>
+  <p><strong>Metriken:</strong> LCP {{ web_perf.lcp_ms or '-' }} ms, CLS {{ web_perf.cls or '-' }}, INP {{ web_perf.inp_ms or '-' }} ms, TBT {{ web_perf.tbt_ms or '-' }} ms, FCP {{ web_perf.fcp_ms or '-' }} ms</p>
+  <p><strong>Risiken:</strong> Render Blocking {{ web_perf.render_blocking_risk }}, Bilder {{ web_perf.image_optimization_risk }}, Mobile {{ web_perf.mobile_performance_risk }}</p>
+  <ul>
+    {% for item in web_perf.recommendations or [] %}<li>{{ item }}</li>{% else %}<li>Keine Empfehlungen vorhanden.</li>{% endfor %}
+  </ul>
+  {% else %}
+  <p>Keine Web-Performance-Daten vorhanden.</p>
+  {% endif %}
+</section>
+
+<section class="panel">
   <h3>Quick Wins</h3>
   <ul>
     {% for item in quick_wins %}
