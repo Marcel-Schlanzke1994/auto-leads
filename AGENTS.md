@@ -47,3 +47,14 @@ Ausnahme: ausschließlich Dokumentations-/Kommentaränderungen.
 - klare Beschreibung von Problem, Lösung, Risiken, Rollback.
 - Nachweis der ausgeführten Checks (oder begründete Doku-only-Ausnahme).
 - sicherheitsrelevante Auswirkungen explizit dokumentieren.
+
+## Skills-Policy (Codex)
+- Projekt-Skills liegen in **`.agents/skills/`**.
+- Skills dürfen **nur aufgabenbezogen** geladen werden (kein blindes/globales Laden).
+- Bei passenden Aufgaben sind **Security-, Review-, Testing- und CI-Skills** bevorzugt zu verwenden.
+- Bei großen Features zuerst ExecPlan gemäß `.agent/PLANS.md` erstellen/aktualisieren.
+- Bei Codeänderungen passende Review- und Test-Skills verbindlich anwenden.
+- Keine destruktiven Befehle ohne klare fachliche Notwendigkeit und Dokumentation.
+- Keine echten Secrets schreiben/lesen, außer für explizite Leak-Prüfungen.
+- Scraping-/Lead-Workflows müssen DSGVO, robots.txt, Rate-Limits und Fair-Use beachten.
+
