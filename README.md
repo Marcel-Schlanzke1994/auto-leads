@@ -178,3 +178,7 @@ npm run dev
 npm run typecheck
 ```
 
+
+
+## Web Perf Audit Erweiterung
+Die Audit-Engine enthält eine additive Web-Performance-Auswertung. Details: `docs/WEB_PERF_AUDIT.md`. Optional kann `PAGESPEED_API_KEY` für erweiterte CWV-nahe Felder gesetzt werden.

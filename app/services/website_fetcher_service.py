@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from urllib.parse import urlparse
 
 import requests
@@ -32,6 +32,7 @@ class FetchResult:
     page_load_ms: int
     redirect_history: list[RedirectHop]
     used_https: bool
+    response_headers: dict[str, str] = field(default_factory=dict)
 
 
 class WebsiteFetchSecurityError(ValueError):
@@ -129,4 +130,7 @@ def fetch_website(
         page_load_ms=int((time.perf_counter() - started) * 1000),
         redirect_history=redirect_history,
         used_https=used_https,
+        response_headers={
+            k.lower(): v for k, v in (getattr(response, "headers", {}) or {}).items()
+        },
     )

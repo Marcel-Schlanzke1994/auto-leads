@@ -47,6 +47,14 @@ CSV_HEADERS = [
     "cwv_cls",
     "cwv_fcp_ms",
     "cwv_ttfb_ms",
+    "web_perf_score",
+    "web_perf_source",
+    "web_perf_lcp_ms",
+    "web_perf_cls",
+    "web_perf_inp_ms",
+    "web_perf_render_blocking_risk",
+    "web_perf_image_optimization_risk",
+    "web_perf_mobile_performance_risk",
     "critical_issues_count",
     "warning_issues_count",
     "opportunity_issues_count",
@@ -263,6 +271,11 @@ def export_leads_csv(leads: list[Lead], filename: str = "leads.csv") -> Response
             attempt_count,
         ) = _contact_metadata(lead)
 
+        web_perf = (
+            (latest_audit.raw_pagespeed_json or {}).get("web_perf")
+            if latest_audit
+            else {}
+        ) or {}
         writer.writerow(
             [
                 lead.id,
@@ -299,6 +312,14 @@ def export_leads_csv(leads: list[Lead], filename: str = "leads.csv") -> Response
                 latest_audit.cwv_cls if latest_audit else None,
                 latest_audit.cwv_fcp_ms if latest_audit else None,
                 latest_audit.cwv_ttfb_ms if latest_audit else None,
+                web_perf.get("performance_score"),
+                web_perf.get("source"),
+                web_perf.get("lcp_ms"),
+                web_perf.get("cls"),
+                web_perf.get("inp_ms"),
+                web_perf.get("render_blocking_risk"),
+                web_perf.get("image_optimization_risk"),
+                web_perf.get("mobile_performance_risk"),
                 issue_counts["critical"],
                 issue_counts["warning"],
                 issue_counts["opportunity"],
