@@ -16,12 +16,19 @@ model = "gpt-5.3-codex"
 max_attempts = 2
 
 [sandbox]
-filesystem = "danger-full-access"
-network = "enabled"
+filesystem = "workspace-write"
+network = "restricted"
 
 [approval]
-strategy = "never"
-# Keine interaktiven Freigaben; alle Schritte müssen automatisierbar und nachvollziehbar sein.
+strategy = "on-request"
+# Sichere Freigabestrategie: erhöhte Zugriffe und kritische Aktionen nur bei Bedarf.
+
+[agents]
+directory = ".codex/agents"
+auto_suggest = true
+allow_parallel_readonly = true
+forbid_parallel_writes_same_file = true
+prefer_readonly_for = ["security", "review", "audit"]
 
 [security]
 forbid_secret_inlining = true

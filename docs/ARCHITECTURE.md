@@ -44,3 +44,17 @@ Auto-Leads ist als Flask-Monolith mit klarer Schichtung aufgebaut:
 - **Security**: CSRF, Rate-Limiter, SSRF-Schutz, Secret-Trennung.
 - **Observability**: strukturiertes Logging pro Job/Lead.
 - **Compliance**: DSGVO-Minimierung, robots/ToS-konformes Crawling.
+
+## Codex-Subagent-Layer
+- Projektbezogene Subagents liegen in `.codex/agents/`.
+- Rollenbasierte Delegation ergänzt die Entwicklungsarchitektur um einen **AI-Execution-Layer**:
+  - **Planung/Orchestrierung** (`planner`, `orchestrator`)
+  - **Implementierung** (`backend-developer`, `fullstack-developer`, `frontend-developer`)
+  - **Qualität/Sicherheit** (`reviewer`, `security-auditor`, `test-engineer`, `ci-cd-specialist`)
+- Governance:
+  - Security/Review standardmäßig read-only.
+  - Keine parallelen Schreibzugriffe auf dieselben Dateien.
+  - Große Features starten mit ExecPlan-Update gemäß `.agent/PLANS.md`.
+- Referenzen:
+  - `docs/SUBAGENTS.md` (Katalog + empfohlene Kernagenten)
+  - `docs/SUBAGENTS_AUDIT.md` (Sicherheitsprüfung + Restrisiken)
