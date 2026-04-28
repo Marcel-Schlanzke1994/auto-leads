@@ -40,7 +40,7 @@ from app.services.outreach_draft_service import (
 )
 from app.services.duplicate_service import normalize_company_name
 from app.services.website_audit_service import audit_website, persist_audit_result
-from app.extensions import db
+from app.extensions import db, limiter
 from app.forms import OUTREACH_STATUS_LABELS, StatusForm
 
 
@@ -387,6 +387,7 @@ def rerun_audit(lead_id: int):
 
 
 @leads_bp.post("/<int:lead_id>/drafts")
+@limiter.limit("20/hour")
 def create_draft(lead_id: int):
     lead = db.session.get(Lead, lead_id)
     if not lead:
@@ -463,6 +464,7 @@ def create_draft(lead_id: int):
 
 
 @leads_bp.post("/<int:lead_id>/drafts/contact-form")
+@limiter.limit("10/hour")
 def create_contact_form_draft(lead_id: int):
     lead = db.session.get(Lead, lead_id)
     if not lead:
