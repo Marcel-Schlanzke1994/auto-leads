@@ -45,6 +45,8 @@ from app.forms import OUTREACH_STATUS_LABELS, StatusForm
 
 leads_bp = Blueprint("leads", __name__, url_prefix="/leads")
 
+DRAFT_STATUSES = {"draft", "approved", "used", "archived"}
+
 
 SORT_OPTIONS = {
     "lead_potential": Lead.score.desc(),
@@ -385,6 +387,10 @@ def create_draft(lead_id: int):
     body = (request.form.get("body") or "").strip()
     language = (request.form.get("language") or "de").strip()[:10]
     tone = (request.form.get("tone") or "").strip()[:50]
+    personalization_notes = (
+        request.form.get("personalization_notes") or ""
+    ).strip() or None
+    draft_status = (request.form.get("status") or "draft").strip()[:30]
 
     if channel not in SUPPORTED_CHANNELS:
         allowed = ", ".join(sorted(SUPPORTED_CHANNELS))
@@ -392,6 +398,9 @@ def create_draft(lead_id: int):
             f"Ungültiger Kanal '{channel}'. Erlaubte Kanäle: {allowed}",
             "error",
         )
+        return redirect(url_for("leads.lead_detail", lead_id=lead.id))
+    if draft_status not in DRAFT_STATUSES:
+        flash("Ungültiger Draft-Status", "error")
         return redirect(url_for("leads.lead_detail", lead_id=lead.id))
 
     generated = generate_outreach_draft(lead=lead, channel=channel)
@@ -427,6 +436,8 @@ def create_draft(lead_id: int):
         body=resolved_body,
         language=language,
         tone=tone or None,
+        personalization_notes=personalization_notes,
+        status=draft_status,
     )
     try:
         with db.session.begin():
@@ -484,6 +495,7 @@ def create_contact_form_draft(lead_id: int):
         subject=draft_payload.subject,
         body=draft_payload.body,
         template_key="contact_form_detected_urls",
+        status="draft",
         meta_json={"target_urls": draft_payload.target_urls, "auto_send": False},
     )
     try:
@@ -514,6 +526,10 @@ def create_contact_attempt(lead_id: int):
         message=(request.form.get("message") or "").strip() or None,
         recipient=(request.form.get("recipient") or "").strip()[:255] or None,
         response_summary=(request.form.get("response_summary") or "").strip() or None,
+        notes=(request.form.get("notes") or "").strip() or None,
+        scheduled_for=_parse_iso_datetime(
+            (request.form.get("scheduled_for") or "").strip()
+        ),
         attempted_at=datetime.now(UTC),
     )
     try:
@@ -544,6 +560,7 @@ def save_phone_note(lead_id: int):
                 channel="phone",
                 status="note",
                 direction="outbound",
+                notes=note,
                 message=note,
                 attempted_at=datetime.now(UTC),
             )
@@ -577,6 +594,7 @@ def set_callback_date(lead_id: int):
                 status="callback_planned",
                 direction="outbound",
                 message="Callback geplant",
+                scheduled_for=callback_dt,
                 attempted_at=callback_dt,
             )
             db.session.add(attempt)
@@ -584,6 +602,43 @@ def set_callback_date(lead_id: int):
     except Exception as exc:  # noqa: BLE001
         db.session.rollback()
         flash(f"Callback konnte nicht gespeichert werden: {exc}", "error")
+    return redirect(url_for("leads.lead_detail", lead_id=lead.id))
+
+
+def _parse_iso_datetime(value: str) -> datetime | None:
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value)
+    except ValueError:
+        return None
+
+
+@leads_bp.post("/<int:lead_id>/drafts/<int:draft_id>/status")
+def update_draft_status(lead_id: int, draft_id: int):
+    lead = db.session.get(Lead, lead_id)
+    if not lead:
+        flash("Lead nicht gefunden", "error")
+        return redirect(url_for("leads.leads_list"))
+
+    draft = db.session.get(OutreachDraft, draft_id)
+    if not draft or draft.lead_id != lead.id:
+        flash("Draft nicht gefunden", "error")
+        return redirect(url_for("leads.lead_detail", lead_id=lead.id))
+
+    selected_status = (request.form.get("status") or "").strip()[:30]
+    if selected_status not in DRAFT_STATUSES:
+        flash("Ungültiger Draft-Status", "error")
+        return redirect(url_for("leads.lead_detail", lead_id=lead.id))
+
+    draft.status = selected_status
+    now = datetime.now(UTC)
+    if selected_status == "approved" and draft.approved_at is None:
+        draft.approved_at = now
+    if selected_status == "used" and draft.sent_at is None:
+        draft.sent_at = now
+    db.session.commit()
+    flash("Draft-Status aktualisiert", "success")
     return redirect(url_for("leads.lead_detail", lead_id=lead.id))
 
 
