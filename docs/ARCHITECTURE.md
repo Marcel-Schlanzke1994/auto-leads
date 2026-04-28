@@ -1,5 +1,7 @@
 # Architektur
 
+**Last verified against commit:** `e7dc57e`
+
 ## Überblick
 Auto-Leads ist als Flask-Monolith mit klarer Schichtung aufgebaut:
 
