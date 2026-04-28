@@ -346,6 +346,8 @@ class Blacklist(db.Model):
     entry_type = db.Column(db.String(20), nullable=False, index=True)
     value = db.Column(db.String(255), nullable=False, index=True)
     value_normalized = db.Column(db.String(255), index=True)
+    email = db.Column(db.String(255), index=True)
+    domain = db.Column(db.String(255), index=True)
     company_name = db.Column(db.String(255))
     reason = db.Column(db.String(255))
     source = db.Column(db.String(100), nullable=False, default="manual")

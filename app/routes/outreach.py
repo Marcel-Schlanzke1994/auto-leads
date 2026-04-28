@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from flask import Blueprint, render_template, request
-from sqlalchemy import func
+from sqlalchemy import func, select
 
 from app.extensions import db
 from app.forms import OUTREACH_STATUS_LABELS
@@ -44,6 +44,7 @@ def outreach_overview() -> str:
         query = query.filter(Lead.industry.ilike(f"%{industry_filter}%"))
 
     filtered_query = query.order_by(Lead.score.desc(), Lead.created_at.desc())
+    filtered_lead_ids = select(filtered_query.with_entities(Lead.id).subquery().c.id)
 
     status_counts_raw = (
         query.with_entities(Lead.status, func.count(Lead.id))
@@ -63,7 +64,7 @@ def outreach_overview() -> str:
     drafts_for_review = (
         OutreachDraft.query.join(Lead, OutreachDraft.lead_id == Lead.id)
         .filter(OutreachDraft.status == "draft")
-        .filter(Lead.id.in_(filtered_query.with_entities(Lead.id).subquery()))
+        .filter(Lead.id.in_(filtered_lead_ids))
         .order_by(OutreachDraft.created_at.desc())
         .limit(20)
         .all()
@@ -72,7 +73,7 @@ def outreach_overview() -> str:
     callback_items = (
         ContactAttempt.query.join(Lead, ContactAttempt.lead_id == Lead.id)
         .filter(ContactAttempt.status == "callback_planned")
-        .filter(Lead.id.in_(filtered_query.with_entities(Lead.id).subquery()))
+        .filter(Lead.id.in_(filtered_lead_ids))
         .order_by(
             ContactAttempt.scheduled_for.asc().nullslast(),
             ContactAttempt.attempted_at.asc().nullslast(),

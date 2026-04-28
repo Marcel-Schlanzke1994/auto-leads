@@ -98,7 +98,8 @@ def check_outreach_block(lead: Lead, channel: str) -> BlockCheckResult:
     if normalized_email:
         email_hit = blacklist_query.filter(
             Blacklist.entry_type == "email",
-            Blacklist.value_normalized == normalized_email,
+            (Blacklist.value_normalized == normalized_email)
+            | (Blacklist.email == normalized_email),
         ).first()
         if email_hit:
             return BlockCheckResult(
@@ -112,7 +113,8 @@ def check_outreach_block(lead: Lead, channel: str) -> BlockCheckResult:
     if normalized_domain:
         domain_hit = blacklist_query.filter(
             Blacklist.entry_type == "domain",
-            Blacklist.value_normalized == normalized_domain,
+            (Blacklist.value_normalized == normalized_domain)
+            | (Blacklist.domain == normalized_domain),
         ).first()
         if domain_hit:
             return BlockCheckResult(

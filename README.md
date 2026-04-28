@@ -139,6 +139,19 @@ black --check .
 flake8
 ```
 
+## Outreach-CRM (ergänzend)
+
+- Bestehende Leads können auf der Detailseite um Outreach-Informationen ergänzt werden:
+  - Kontaktstatus, Drafts, ContactAttempts, Callback, Opt-Out/Blacklist.
+- Das System erzeugt nur Drafts (E-Mail/Kontaktformular/Telefonskript), kein automatischer Versand.
+- Opt-Out/Blacklist blockiert die Draft-Erzeugung und markiert Kontakte als gesperrt.
+- CSV-Export enthält zusätzliche Outreach-Spalten wie `contact_status`, `last_contact_at`, `next_callback_at`, `outreach_allowed`, `draft_count`, `attempt_count`.
+- Nach Pull neuer Änderungen Migrationen ausführen:
+
+```bash
+flask db upgrade
+```
+
 
 ## Planungs- und Agent-Workflow
 

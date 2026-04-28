@@ -286,7 +286,10 @@ def lead_detail(lead_id: int) -> str:
             db.or_(
                 db.and_(
                     Blacklist.entry_type == "email",
-                    Blacklist.value_normalized == email_normalized,
+                    db.or_(
+                        Blacklist.value_normalized == email_normalized,
+                        Blacklist.email == email_normalized,
+                    ),
                 ),
                 db.and_(
                     Blacklist.entry_type == "phone",
@@ -294,7 +297,10 @@ def lead_detail(lead_id: int) -> str:
                 ),
                 db.and_(
                     Blacklist.entry_type == "domain",
-                    Blacklist.value_normalized == domain,
+                    db.or_(
+                        Blacklist.value_normalized == domain,
+                        Blacklist.domain == domain,
+                    ),
                 ),
                 db.and_(
                     Blacklist.entry_type == "company",
@@ -716,11 +722,15 @@ def set_contact_block(lead_id: int):
                 existing.active = True
                 existing.reason = reason or existing.reason
             else:
+                email_value = email_normalized if entry_type == "email" else None
+                domain_value = domain if entry_type == "domain" else None
                 db.session.add(
                     Blacklist(
                         entry_type=entry_type,
                         value=value_normalized,
                         value_normalized=value_normalized,
+                        email=email_value,
+                        domain=domain_value,
                         company_name=company_name or None,
                         reason=reason,
                     )
