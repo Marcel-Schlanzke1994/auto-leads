@@ -58,6 +58,10 @@ GOOGLE_MAPS_API_KEY=PASTE_YOUR_NEW_GOOGLE_API_KEY_HERE
 PAGESPEED_API_KEY=
 GOOGLE_PLACES_TIMEOUT=8
 GOOGLE_PLACES_MIN_INTERVAL_SECONDS=2.1
+GOOGLE_PLACES_RETRY_MAX_ATTEMPTS=4
+GOOGLE_PLACES_RETRY_BACKOFF_BASE=0.5
+GOOGLE_PLACES_RETRY_MAX_DELAY=8
+GOOGLE_PLACES_RETRY_JITTER=0.3
 WEBSITE_FETCH_TIMEOUT=8
 WEBSITE_FETCH_MIN_INTERVAL_SECONDS=0
 PAGESPEED_TIMEOUT=8
@@ -87,6 +91,7 @@ flask --app run.py run
 - API-Keys (`GOOGLE_MAPS_API_KEY`, `PAGESPEED_API_KEY`) gehören nur in `.env`/Secret-Store, niemals in den Quellcode oder Commits.
 - `USER_AGENT` sollte korrekt gepflegt werden, damit externe Dienste Anfragen eindeutig zuordnen können.
 - Timeout- und Rate-Limits pro externem Service sind explizit konfigurierbar (Google Places, Website-Fetch, PageSpeed), um Missbrauch und Sperren zu vermeiden.
+- Google-Places-Retries (429/5xx/Netzwerkfehler) sind über `GOOGLE_PLACES_RETRY_MAX_ATTEMPTS`, `GOOGLE_PLACES_RETRY_BACKOFF_BASE`, `GOOGLE_PLACES_RETRY_MAX_DELAY` und `GOOGLE_PLACES_RETRY_JITTER` steuerbar.
 
 ## Legal / Compliance
 
