@@ -1,32 +1,54 @@
 # Codex workspace configuration for auto-leads
+# Ziel: sichere Defaults, reproduzierbarer Workflow, klare Qualitäts-Gates.
 
 [model]
-name = "gpt-5.3-codex"
+default = "gpt-5.3-codex"
 reasoning = "balanced"
 
+[model.review]
+enabled = true
+model = "gpt-5.3-codex"
+strict = true
+
+[model.autofix]
+enabled = true
+model = "gpt-5.3-codex"
+max_attempts = 2
+
 [sandbox]
-mode = "danger-full-access"
-network = true
+filesystem = "danger-full-access"
+network = "enabled"
+
+[approval]
+strategy = "never"
+# Keine interaktiven Freigaben; alle Schritte müssen automatisierbar und nachvollziehbar sein.
+
+[security]
+forbid_secret_inlining = true
+blocked_patterns = [
+  "AKIA",
+  "-----BEGIN PRIVATE KEY-----",
+  "xoxb-",
+  "ghp_"
+]
+secret_env_files = [".env", ".env.*"]
+require_env_vars_over_hardcoded_paths = true
+
+[quality]
+required_on_code_changes = [
+  "pytest",
+  "black --check .",
+  "flake8"
+]
+allow_docs_only_skip = true
 
 [workflow]
 default_branch = "main"
-require_plan_for_large_changes = true
-run_tests_after_code_changes = true
-allow_docs_only_skip_tests = true
+plan_file = ".agent/PLANS.md"
+master_execplan = "docs/execplans/auto-lead-system-execplan.md"
 
 [workflow.commands]
 test = "pytest"
 lint_black = "black --check ."
 lint_flake8 = "flake8"
 start_app = "python run.py"
-
-[security]
-secret_files = [".env", ".env.*"]
-forbid_hardcoded_secrets = true
-require_github_secrets_for_ci = true
-
-[docs]
-architecture = "docs/ARCHITECTURE.md"
-operations = "docs/OPERATIONS.md"
-roadmap = "docs/ROADMAP.md"
-execplan = "docs/execplans/auto-lead-system-execplan.md"

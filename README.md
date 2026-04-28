@@ -107,3 +107,14 @@ pytest
 black --check .
 flake8
 ```
+
+
+## Planungs- und Agent-Workflow
+
+Für einen einheitlichen Ablauf zwischen Entwicklern und Agenten gelten folgende Steuerdateien:
+
+- `.agent/PLANS.md`: verbindliches Planformat mit den Abschnitten **Ziele, Milestones, Decision Log, Risks, Progress**.
+- `.codex/config.toml`: sichere Codex-Defaults (u. a. Secret-Handling, Sandbox/Approval-Strategie, bevorzugte Qualitäts-Checks).
+- Operativer Master-Plan: `docs/execplans/auto-lead-system-execplan.md`.
+
+Änderungen sollten immer entlang des ExecPlans geplant und in den oben genannten Dateien konsistent dokumentiert werden.
