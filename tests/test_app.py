@@ -2,7 +2,7 @@ from types import SimpleNamespace
 
 from auto_leads.extensions import db
 from app.models import Lead, SearchJob
-from app.services.duplicate_service import is_duplicate_candidate
+from app.services.duplicate_service import is_duplicate
 from app.services.lead_score_service import calculate_lead_score
 from app.services.search_runner_service import (
     _create_places_client,
@@ -45,39 +45,49 @@ def test_duplicate_filter(app):
         db.session.add(
             Lead(
                 company_name="Muster GmbH",
+                normalized_company_name="muster",
                 source_query="x",
+                city="Köln",
+                city_normalized="köln",
                 website="https://firma.de",
+                domain="firma.de",
                 phone="+49 1234",
+                phone_normalized="+491234",
                 email="x@firma.de",
+                email_normalized="x@firma.de",
                 google_place_id="abc",
             )
         )
         db.session.commit()
 
-        assert is_duplicate_candidate(
+        assert is_duplicate(
             place_id="abc",
             company_name="Andere",
+            city=None,
             website=None,
             phone=None,
             email=None,
         )
-        assert is_duplicate_candidate(
+        assert is_duplicate(
             place_id=None,
             company_name="Neu",
+            city=None,
             website="https://firma.de/kontakt",
             phone=None,
             email=None,
         )
-        assert is_duplicate_candidate(
+        assert is_duplicate(
             place_id=None,
             company_name="MUSTER GMBH",
+            city=None,
             website=None,
             phone=None,
             email=None,
         )
-        assert is_duplicate_candidate(
+        assert is_duplicate(
             place_id=None,
             company_name="neu name",
+            city=None,
             website=None,
             phone="+491234",
             email=None,

@@ -7,7 +7,14 @@ from typing import Any
 from flask import Flask
 
 from app.models import Lead, SearchJob
-from app.services.duplicate_service import is_duplicate_candidate
+from app.services.duplicate_service import (
+    is_duplicate,
+    normalize_city,
+    normalize_company_name,
+    normalize_domain,
+    normalize_email,
+    normalize_phone,
+)
 from app.services.extraction_service import extract_city, is_relevant_business
 from app.services.google_places_service import (
     GooglePlacesClient,
@@ -94,12 +101,13 @@ def _run_search_job(app: Flask, job_id: int, keyword: str, cities: list[str]) ->
                         job.filtered_out += 1
                         continue
                     lead = _build_lead(place, keyword, query)
-                    if is_duplicate_candidate(
+                    if is_duplicate(
                         place_id=lead.google_place_id,
                         company_name=lead.company_name,
+                        city=lead.city,
                         website=lead.website,
                         phone=lead.phone,
-                        email=None,
+                        email=lead.email,
                     ):
                         job.duplicates_skipped += 1
                         continue
@@ -147,13 +155,20 @@ def _create_places_client(app: Flask) -> tuple[Any | None, str, str | None]:
 
 
 def _build_lead(place: PlaceSummary, keyword: str, query: str) -> Lead:
+    city = _extract_city(place.address_components, place.formatted_address)
+    website = normalize_website_url(place.website)
+
     return Lead(
         company_name=place.display_name,
+        normalized_company_name=normalize_company_name(place.display_name),
         industry=keyword,
-        city=_extract_city(place.address_components, place.formatted_address),
+        city=city,
+        city_normalized=normalize_city(city),
         address=place.formatted_address,
-        website=normalize_website_url(place.website),
+        website=website,
+        domain=normalize_domain(website),
         phone=place.phone,
+        phone_normalized=normalize_phone(place.phone),
         google_place_id=place.place_id,
         google_rating=place.rating,
         review_count=place.review_count,
@@ -190,6 +205,13 @@ def _enrich_lead_with_audit(lead: Lead, app: Flask) -> None:
         lead.email = audit.email
     if not lead.phone:
         lead.phone = audit.phone
+
+    lead.domain = normalize_domain(lead.website)
+    lead.normalized_company_name = normalize_company_name(lead.company_name)
+    lead.city_normalized = normalize_city(lead.city)
+    lead.phone_normalized = normalize_phone(lead.phone)
+    lead.email_normalized = normalize_email(lead.email)
+
     lead.owner_name = audit.owner_name
     lead.legal_form = audit.legal_form
 
