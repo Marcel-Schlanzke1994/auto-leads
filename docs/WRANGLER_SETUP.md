@@ -74,3 +74,13 @@ Da nur optionale Cloudflare-Entwicklungsdateien/Docs ergänzt werden:
 - Cloudflare optional:
   - `cd cloudflare && npm ci`
   - `cd cloudflare && npm run typecheck`
+
+## Optionale Cloudflare Email Secrets (Phase 8)
+
+Nur falls `EMAIL_PROVIDER=cloudflare` bewusst aktiviert wird:
+
+```bash
+npx wrangler secret put CLOUDFLARE_EMAIL_API_TOKEN
+```
+
+Zusätzlich ENV-Variablen für Sender/Feature-Flag lokal setzen (keine echten Werte in Git).
