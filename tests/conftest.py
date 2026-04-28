@@ -18,6 +18,7 @@ def app():
             "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
             "RATELIMIT_ENABLED": False,
             "GOOGLE_MAPS_API_KEY": "test-key",
+            "API_AUTH_TOKEN": "test-api-token",
         }
     )
     with app.app_context():

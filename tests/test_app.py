@@ -202,6 +202,7 @@ def test_api_search_start_with_target_count(client, app, monkeypatch):
     response = client.post(
         "/api/search/start",
         json={"keyword": "Elektriker", "cities": "Köln, Bonn", "target_count": 777},
+        headers={"X-API-Key": app.config["API_AUTH_TOKEN"]},
     )
 
     assert response.status_code == 202
@@ -214,6 +215,7 @@ def test_api_search_start_with_invalid_target_count_returns_400(client):
     response = client.post(
         "/api/search/start",
         json={"keyword": "Elektriker", "cities": "Köln", "target_count": "abc"},
+        headers={"X-API-Key": "test-api-token"},
     )
 
     assert response.status_code == 400
@@ -236,6 +238,7 @@ def test_api_search_start_with_negative_target_count_clamps_to_minimum(
     response = client.post(
         "/api/search/start",
         json={"keyword": "Elektriker", "cities": "Köln", "target_count": -5},
+        headers={"X-API-Key": app.config["API_AUTH_TOKEN"]},
     )
 
     assert response.status_code == 202
@@ -243,6 +246,16 @@ def test_api_search_start_with_negative_target_count_clamps_to_minimum(
     assert payload["job_id"] == 124
     assert payload["status"] == "queued"
     assert payload["target_count"] == 1
+
+
+def test_api_search_start_without_token_returns_401(client):
+    response = client.post(
+        "/api/search/start",
+        json={"keyword": "Elektriker", "cities": "Köln"},
+    )
+
+    assert response.status_code == 401
+    assert response.get_json() == {"error": "unauthorized"}
 
 
 def test_csv_export_contains_new_fields(client, app):

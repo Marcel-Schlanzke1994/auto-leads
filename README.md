@@ -62,6 +62,7 @@ WEBSITE_FETCH_TIMEOUT=8
 WEBSITE_FETCH_MIN_INTERVAL_SECONDS=0
 PAGESPEED_TIMEOUT=8
 PAGESPEED_MIN_INTERVAL_SECONDS=0
+API_AUTH_TOKEN=change-me-to-a-long-random-token
 ```
 
 ## Start (validiert)
@@ -99,6 +100,31 @@ flask --app run.py run
 - `GET /api/leads/<id>`
 - `POST /api/search/start` (`keyword`, `cities`, optional `target_count`)
 - `GET /api/search/progress?job_id=<id>`
+
+### API-Sicherheitsstrategie (explizit)
+
+Für den API-Blueprint ist CSRF **bewusst deaktiviert**. Stattdessen gilt für schreibende
+Endpoints (aktuell: `POST /api/search/start`) ein API-Contract mit
+Token-Authentifizierung, strengeren Limits und Input-Validierung:
+
+- Authentifizierung per Header `X-API-Key` gegen `API_AUTH_TOKEN`.
+- Ohne/mit falschem Token: `401 {"error":"unauthorized"}`.
+- Wenn `API_AUTH_TOKEN` nicht konfiguriert ist: `503 {"error":"api auth token is not configured"}`.
+- Strikteres Rate-Limit für den Start-Endpoint: `5/minute;30/hour`.
+- Request muss JSON sein (`Content-Type: application/json`) und ein JSON-Objekt enthalten.
+- Validierung:
+  - `keyword` erforderlich, max. 120 Zeichen.
+  - `cities` erforderlich, 1 bis 25 Städte (kommagetrennt).
+  - `target_count` muss Integer sein; Werte werden auf `1..SEARCH_MAX_TARGET_COUNT` begrenzt.
+
+Beispiel:
+
+```bash
+curl -X POST http://127.0.0.1:5000/api/search/start \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: $API_AUTH_TOKEN" \
+  -d '{"keyword":"Elektriker","cities":"Köln, Bonn","target_count":250}'
+```
 
 ## Tests & Qualitätschecks
 
