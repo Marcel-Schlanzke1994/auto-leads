@@ -1,6 +1,6 @@
 from types import SimpleNamespace
 
-from auto_leads.extensions import db
+from app.extensions import db
 from app.models import Lead, SearchJob
 from app.services.duplicate_service import is_duplicate
 from app.services.lead_score_service import calculate_lead_score
@@ -9,7 +9,7 @@ from app.services.search_runner_service import (
     _extract_city,
     _run_search_job,
 )
-from auto_leads.utils import (
+from app.utils import (
     is_private_hostname,
     normalize_website_url,
     parse_float,
@@ -198,7 +198,7 @@ def test_api_search_start_with_target_count(client, app, monkeypatch):
         assert target_count == 777
         return SimpleNamespace(id=123, status="queued")
 
-    monkeypatch.setattr("auto_leads.routes.api.start_search_job", fake_start_search_job)
+    monkeypatch.setattr("app.routes.api.start_search_job", fake_start_search_job)
     response = client.post(
         "/api/search/start",
         json={"keyword": "Elektriker", "cities": "Köln, Bonn", "target_count": 777},

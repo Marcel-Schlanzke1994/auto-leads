@@ -15,7 +15,7 @@ from app.services.extraction_service import extract_company_profile
 from app.services.pagespeed_service import analyze_pagespeed, extract_page_load_ms
 from app.services.seo_check_service import CheckResult, analyze_seo, run_all_seo_checks
 from app.services.website_fetcher import fetch_website
-from auto_leads.extensions import db
+from app.extensions import db
 
 
 @dataclass(slots=True)

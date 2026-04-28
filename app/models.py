@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
-from auto_leads.extensions import db
+from app.extensions import db
 
 
 class Lead(db.Model):
