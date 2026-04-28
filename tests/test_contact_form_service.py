@@ -53,3 +53,14 @@ def test_build_contact_form_draft_lists_detected_urls():
         "https://example.com/contact",
         "https://example.com/kontakt",
     ]
+
+
+def test_build_contact_form_draft_contains_fixed_signature():
+    lead = Lead(company_name="Muster AG", source_query="x")
+
+    draft = build_contact_form_draft(lead, ["https://example.com/contact"])
+
+    assert "Marcel Schlanzke" in draft.body
+    assert "SEO-Analyse & Website-Optimierung" in draft.body
+    assert "marcel-schlanzke.de" in draft.body
+    assert "kontakt@marcel-schlanzke.de" in draft.body

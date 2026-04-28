@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from urllib.parse import urlparse
 
 from app.models import AuditResult, Lead
+from app.services.outreach_draft_service import FIXED_SIGNATURE
 
 CONTACT_HINT_PATTERN = re.compile(
     r"(kontakt|contact|kontaktformular|contact-form|reach-us|get-in-touch|support)",
@@ -76,9 +77,7 @@ def build_contact_form_draft(lead: Lead, target_urls: list[str]) -> ContactFormD
         "Ihnen eine kurze Prioritätenliste als unverbindlichen Entwurf.\n\n"
         "Vorgesehene Kontaktseiten (nur Draft, kein Versand):\n"
         f"{targets}\n\n"
-        "Freundliche Grüße\n"
-        "Marcel Schlanzke\n"
-        "auto-leads"
+        f"{FIXED_SIGNATURE}"
     )
     return ContactFormDraft(subject=subject, body=body, target_urls=target_urls)
 
