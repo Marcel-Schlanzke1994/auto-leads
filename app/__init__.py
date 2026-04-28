@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 # korrekt übernommen werden.
 load_dotenv()
 
-from flask import Flask  # noqa: E402
+from flask import Flask, flash, redirect, request, url_for  # noqa: E402
 
 from app.extensions import csrf, db, limiter, migrate  # noqa: E402
 from app.routes.dashboard import dashboard_bp  # noqa: E402
@@ -65,6 +65,7 @@ def create_app(test_config: dict | None = None) -> Flask:
     from app import models  # noqa: F401
 
     _configure_logging(app)
+    _register_error_handlers(app)
     return app
 
 
@@ -87,3 +88,19 @@ def _validate_security_config(app: Flask) -> None:
             "SECRET_KEY muss in Produktion gesetzt sein "
             "und darf kein Default-/Placeholder-Wert sein."
         )
+
+
+def _register_error_handlers(app: Flask) -> None:
+    @app.errorhandler(429)
+    def handle_rate_limit(_error):  # noqa: ANN001
+        if request.path.startswith("/api/"):
+            return {"error": "Zu viele Anfragen. Bitte später erneut versuchen."}, 429
+
+        flash(
+            (
+                "Zu viele Anfragen in kurzer Zeit. "
+                "Bitte warte einen Moment und versuche es erneut."
+            ),
+            "error",
+        )
+        return redirect(request.referrer or url_for("leads.leads_list"))
