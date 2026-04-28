@@ -115,7 +115,7 @@ def test_score_calculation_contains_reasons(app):
         lead = Lead(company_name="Score GmbH", source_query="q")
         score, reasons = calculate_lead_score(lead)
     assert score > 0
-    assert any("Wenig Reviews" in item for item in reasons)
+    assert any("REVIEW_COUNT_LOW" in item for item in reasons)
 
 
 def test_lead_creation_and_dashboard(client, app):

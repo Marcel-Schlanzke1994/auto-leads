@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 from datetime import UTC, datetime
 from threading import Thread
 from typing import Any
@@ -21,7 +23,10 @@ from app.services.google_places_service import (
     GooglePlacesError,
     PlaceSummary,
 )
-from app.services.lead_score_service import calculate_lead_score
+from app.services.lead_score_service import (
+    calculate_lead_score,
+    calculate_lead_score_details,
+)
 from app.services.website_audit_service import audit_website, persist_audit_result
 from auto_leads.extensions import db
 from auto_leads.utils import normalize_website_url
@@ -145,8 +150,10 @@ def _run_search_job(app: Flask, job_id: int, keyword: str, cities: list[str]) ->
                         )
                         continue
                     _enrich_lead_with_audit(lead, app)
-                    lead.score, reasons = calculate_lead_score(lead)
-                    lead.score_reasons = "\n".join(reasons)
+                    lead.score, _ = calculate_lead_score(lead)
+                    lead.score_reasons = json.dumps(
+                        calculate_lead_score_details(lead), ensure_ascii=False
+                    )
                     db.session.add(lead)
                     db.session.commit()
                     job.total_created += 1
