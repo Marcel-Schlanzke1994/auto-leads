@@ -160,3 +160,63 @@ Zusätzlich empfohlen:
 - Delegation wird reproduzierbar, auditierbar und rollenbasiert.
 - Security- und Review-Prozesse sind operationalisiert.
 
+
+## 19) Skills Integration Update (2026-04-28)
+
+### Purpose / Big Picture
+Ein kuratierter Skill-Katalog soll Codex für Auto-Lead-Aufgaben zielgenauer machen (Lead-Discovery, Audit, Security, Testing, CI/CD), ohne den Kontext durch ungeeignete Skills zu überladen.
+
+### Aktuelle Skill-Integration
+- Neue lokale Skill-Basis unter `.agents/skills/` angelegt.
+- 24 Skills integriert, davon 6 auto-lead-spezifisch.
+- Governance in `AGENTS.md` ergänzt (task-fit, security-first, no destructive defaults).
+
+### Zielstruktur
+- `.agents/skills/<skill-name>/SKILL.md` je Skill.
+- `docs/SKILLS.md` als Nutzungs- und Priorisierungskatalog.
+- `docs/SKILLS_AUDIT.md` als Security-/Compliance-Audit.
+
+### Sicherheitsentscheidungen
+- Keine Übernahme von Skills mit unklaren oder aggressiven Netzwerk-/Scraping-Mechaniken.
+- Keine destruktiven Git-Defaults in Skill-Workflows.
+- Secrets ausschließlich über Umgebungsvariablen; Leak-Scanning als Pflichtcheck.
+
+### Progress
+- Status: done
+- Last update: 2026-04-28
+- Completed since last update:
+  - Skill-Verzeichnis initialisiert und 24 Skills angelegt.
+  - Sicherheitsaudit und Katalogdokumentation erstellt.
+  - Codex-Config um Skill-Discovery ergänzt (`on-demand`).
+- Next actions:
+  - Teamweite Prompt-Shortcuts je Skill dokumentieren.
+  - Quartalsweises Re-Audit terminieren.
+- Open blockers:
+  - Keine.
+
+### Decision Log
+- Date: 2026-04-28
+  - Decision: Nur projektrelevante Skills integrieren statt Vollimport.
+  - Rationale: Reduziert Kontextrauschen und Sicherheitsrisiken.
+  - Alternatives considered: Vollständige Spiegelung aller Awesome-Skills.
+  - Impact: Bessere Fokusqualität, geringerer Pflegeaufwand.
+- Date: 2026-04-28
+  - Decision: Eigene Auto-Lead-Skills ergänzen.
+  - Rationale: Offizielle Skills decken domänenspezifische Workflows nur teilweise ab.
+  - Alternatives considered: Reine Generic-Skill-Nutzung.
+  - Impact: Höhere Domänengenauigkeit, mehr Wartungspflicht.
+
+### Surprises & Discoveries
+- Das Awesome-Repository ist primär ein Verzeichnis/Index und enthält nicht den vollständigen lokalen Skill-Dateibaum.
+- Für Auto-Lead-spezifische Anforderungen (Impressum, Dedupe, lokale SEO) waren eigene Skills erforderlich.
+
+### Outcomes & Retrospective
+- Codex kann jetzt sicher und task-spezifisch auf Skill-Workflows zugreifen.
+- Security-/Review-/Testing-Use-Cases sind explizit priorisiert.
+- Scraping-/Lead-Prozesse wurden um Compliance-Grenzen ergänzt.
+
+### Validierungsschritte
+- Dateistruktur-Check für `.agents/skills/`.
+- Secret-Pattern-Scan über neue Skill- und Doku-Dateien.
+- Scan auf `danger-full-access` und destruktive Git-Kommandos.
+- Markdown-Dateien syntaktisch geprüft (format-strukturell).

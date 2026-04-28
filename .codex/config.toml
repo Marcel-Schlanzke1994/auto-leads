@@ -59,3 +59,9 @@ test = "pytest"
 lint_black = "black --check ."
 lint_flake8 = "flake8"
 start_app = "python run.py"
+
+[skills]
+directory = ".agents/skills"
+load_strategy = "on-demand"
+prefer_project_skills = true
+max_active_skills = 3
