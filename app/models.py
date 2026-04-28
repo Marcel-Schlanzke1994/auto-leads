@@ -9,17 +9,28 @@ from auto_leads.extensions import db
 class Lead(db.Model):
     __tablename__ = "leads"
 
+    __table_args__ = (
+        db.Index(
+            "ix_leads_normalized_name_city",
+            "normalized_company_name",
+            "city_normalized",
+        ),
+    )
+
     id = db.Column(db.Integer, primary_key=True)
     company_name = db.Column(db.String(255), nullable=False, index=True)
     normalized_company_name = db.Column(db.String(255), index=True)
     industry = db.Column(db.String(120), index=True)
     city = db.Column(db.String(120), index=True)
+    city_normalized = db.Column(db.String(120), index=True)
     address = db.Column(db.String(255))
 
     website = db.Column(db.String(500), index=True)
-    domain = db.Column(db.String(255), index=True)
+    domain = db.Column(db.String(255), unique=True, index=True)
     email = db.Column(db.String(255), index=True)
+    email_normalized = db.Column(db.String(255), index=True)
     phone = db.Column(db.String(120), index=True)
+    phone_normalized = db.Column(db.String(40), index=True)
     owner_name = db.Column(db.String(255))
     legal_form = db.Column(db.String(80))
 

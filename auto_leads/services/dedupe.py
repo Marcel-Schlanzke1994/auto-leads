@@ -1,3 +1,3 @@
-from app.services.duplicate_service import extract_domain, is_duplicate_candidate
+from app.services.duplicate_service import is_duplicate, normalize_domain
 
-__all__ = ["extract_domain", "is_duplicate_candidate"]
+__all__ = ["is_duplicate", "normalize_domain"]
