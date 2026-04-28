@@ -34,6 +34,10 @@ from app.services.lead_score_service import (
     calculate_lead_score,
     calculate_lead_score_details,
 )
+from app.services.outreach_draft_service import (
+    SUPPORTED_CHANNELS,
+    generate_outreach_draft,
+)
 from app.services.website_audit_service import audit_website, persist_audit_result
 from app.extensions import db
 from app.forms import OUTREACH_STATUS_LABELS, StatusForm
@@ -381,21 +385,54 @@ def create_draft(lead_id: int):
     body = (request.form.get("body") or "").strip()
     language = (request.form.get("language") or "de").strip()[:10]
     tone = (request.form.get("tone") or "").strip()[:50]
-    if not body:
+
+    if channel not in SUPPORTED_CHANNELS:
+        allowed = ", ".join(sorted(SUPPORTED_CHANNELS))
+        flash(
+            f"Ungültiger Kanal '{channel}'. Erlaubte Kanäle: {allowed}",
+            "error",
+        )
+        return redirect(url_for("leads.lead_detail", lead_id=lead.id))
+
+    generated = generate_outreach_draft(lead=lead, channel=channel)
+    if generated.blocked:
+        reason = generated.error_message or "Lead ist für Outreach blockiert"
+        flash(
+            f"Kein Draft gespeichert: Outreach blockiert ({reason}). "
+            "Bitte Opt-out/Blacklist prüfen.",
+            "error",
+        )
+        return redirect(url_for("leads.lead_detail", lead_id=lead.id))
+
+    if generated.status != "ok":
+        flash(
+            generated.error_message
+            or "Draft konnte nicht automatisch generiert werden",
+            "error",
+        )
+        return redirect(url_for("leads.lead_detail", lead_id=lead.id))
+
+    resolved_subject = subject or generated.subject
+    resolved_body = body or generated.body
+    if not resolved_body:
         flash("Draft-Text darf nicht leer sein", "error")
         return redirect(url_for("leads.lead_detail", lead_id=lead.id))
+
+    existing_drafts_count = OutreachDraft.query.filter_by(lead_id=lead.id).count()
 
     draft = OutreachDraft(
         lead_id=lead.id,
         channel=channel,
-        subject=subject or None,
-        body=body,
+        subject=resolved_subject or None,
+        body=resolved_body,
         language=language,
         tone=tone or None,
     )
     try:
         with db.session.begin():
             db.session.add(draft)
+            if existing_drafts_count == 0:
+                lead.status = "draft_created"
         flash("Draft erstellt", "success")
     except Exception as exc:  # noqa: BLE001
         db.session.rollback()
@@ -420,9 +457,27 @@ def create_contact_form_draft(lead_id: int):
         lead.contact_form_urls, detected_urls
     )
 
+    block_or_generation = generate_outreach_draft(lead=lead, channel="contact_form")
+    if block_or_generation.blocked:
+        reason = block_or_generation.error_message or "Lead ist für Outreach blockiert"
+        flash(
+            f"Kein Kontaktformular-Draft gespeichert: Outreach blockiert ({reason}). "
+            "Bitte Opt-out/Blacklist prüfen.",
+            "error",
+        )
+        return redirect(url_for("leads.lead_detail", lead_id=lead.id))
+    if block_or_generation.status != "ok":
+        flash(
+            block_or_generation.error_message
+            or "Kontaktformular-Draft konnte nicht generiert werden",
+            "error",
+        )
+        return redirect(url_for("leads.lead_detail", lead_id=lead.id))
+
     draft_payload = build_contact_form_draft(
         lead=lead, target_urls=lead.contact_form_urls or detected_urls
     )
+    existing_drafts_count = OutreachDraft.query.filter_by(lead_id=lead.id).count()
     draft = OutreachDraft(
         lead_id=lead.id,
         channel="contact_form",
@@ -433,6 +488,8 @@ def create_contact_form_draft(lead_id: int):
     )
     try:
         db.session.add(draft)
+        if existing_drafts_count == 0:
+            lead.status = "draft_created"
         db.session.commit()
         flash("Kontaktformular-Draft erstellt (kein Versand).", "success")
     except Exception as exc:  # noqa: BLE001
