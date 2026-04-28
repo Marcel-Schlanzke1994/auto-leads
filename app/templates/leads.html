@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+{% block title %}Leads - Auto Leads{% endblock %}
+{% block content %}
+<section class="panel">
+  <h2>Leadliste</h2>
+  <form method="get" class="split">
+    <input id="lead-filter" name="q" type="search" value="{{ query }}" placeholder="Nach Firma suchen..." />
+    <button class="btn" type="submit">Filtern</button>
+  </form>
+  <div class="table-wrap">
+    <table id="lead-table">
+      <thead>
+        <tr><th>Firma</th><th>Stadt</th><th>Website</th><th>E-Mail</th><th>Telefon</th><th>Score</th><th>Status</th></tr>
+      </thead>
+      <tbody>
+        {% for lead in leads %}
+        <tr>
+          <td><a href="{{ url_for('leads.lead_detail', lead_id=lead.id) }}">{{ lead.company_name }}</a></td>
+          <td>{{ lead.city or '-' }}</td>
+          <td>{% if lead.website %}<a href="{{ lead.website }}" target="_blank" rel="noopener noreferrer">{{ lead.website }}</a>{% else %}-{% endif %}</td>
+          <td>{{ lead.email or '-' }}</td>
+          <td>{{ lead.phone or '-' }}</td>
+          <td>{{ lead.score }}</td>
+          <td><span class="pill {{ lead.status }}">{{ lead.status }}</span></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7">Keine Leads vorhanden.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

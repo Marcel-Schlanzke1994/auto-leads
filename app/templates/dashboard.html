@@ -1,0 +1,41 @@
+{% extends 'base.html' %}
+{% block title %}Dashboard - Auto Leads{% endblock %}
+{% block content %}
+<section class="panel">
+  <h2>Neue Suche starten</h2>
+  <form method="post" class="form-grid">
+    {{ form.hidden_tag() }}
+    <label>Suchbegriff {{ form.keyword(placeholder='z. B. Dachdecker') }}</label>
+    <label>Städte (kommagetrennt) {{ form.cities(placeholder='Köln, Bonn, Leverkusen') }}</label>
+    <label>Zielanzahl (max. 1000) {{ form.target_count(value=form.target_count.data or 1000, min=1, max=1000) }}</label>
+    <div>{{ form.submit(class_='btn') }}</div>
+  </form>
+</section>
+
+<section class="cards">
+  <article class="card"><h3>Leads gesamt</h3><p>{{ stats.total }}</p></article>
+  <article class="card"><h3>Neue Leads</h3><p>{{ stats.new }}</p></article>
+  <article class="card"><h3>High Score (>=70)</h3><p>{{ stats.high_score }}</p></article>
+  <article class="card"><h3>Mit Google Rating</h3><p>{{ stats.with_google_rating }}</p></article>
+</section>
+
+{% if latest_job %}
+<section class="panel">
+  <h2>Letzter Suchjob #{{ latest_job.id }}</h2>
+  <p>Status: <span class="pill {{ latest_job.status }}">{{ latest_job.status }}</span></p>
+  <p>{{ latest_job.message }}</p>
+</section>
+{% endif %}
+
+<section class="panel">
+  <h2>Neueste Leads</h2>
+  <ul>
+    {% for lead in leads %}
+      <li><a href="{{ url_for('leads.lead_detail', lead_id=lead.id) }}">{{ lead.company_name }}</a> ({{ lead.city or '-' }})</li>
+    {% else %}
+      <li>Keine Leads vorhanden.</li>
+    {% endfor %}
+  </ul>
+  <p><a class="btn" href="{{ url_for('leads.leads_list') }}">Alle Leads anzeigen</a></p>
+</section>
+{% endblock %}

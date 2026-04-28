@@ -1,0 +1,13 @@
+{% extends 'base.html' %}
+{% block title %}Job #{{ job.id }} - Auto Leads{% endblock %}
+{% block content %}
+<section class="panel">
+  <h2>Job #{{ job.id }}</h2>
+  <p><strong>Keyword:</strong> {{ job.keyword }}</p>
+  <p><strong>Städte:</strong> {{ job.cities }}</p>
+  <p><strong>Status:</strong> <span class="pill {{ job.status }}">{{ job.status }}</span></p>
+  <p><strong>Fortschritt:</strong> {{ job.total_created }} / {{ job.target_count }}</p>
+  <p><strong>Verarbeitet:</strong> {{ job.total_processed }} | <strong>Roh:</strong> {{ job.total_found_raw }}</p>
+  <p><strong>Nachricht:</strong> {{ job.message }}</p>
+</section>
+{% endblock %}

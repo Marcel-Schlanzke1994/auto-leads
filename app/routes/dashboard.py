@@ -1,0 +1,66 @@
+from __future__ import annotations
+
+from flask import (
+    Blueprint,
+    current_app,
+    flash,
+    redirect,
+    render_template,
+    request,
+    url_for,
+)
+
+from app.models import Lead, SearchJob
+from app.services.search_runner_service import start_search_job
+from auto_leads.forms import SearchForm
+from auto_leads.extensions import limiter
+
+
+dashboard_bp = Blueprint("dashboard", __name__)
+
+
+@dashboard_bp.route("/", methods=["GET", "POST"])
+@dashboard_bp.route("/dashboard", methods=["GET", "POST"])
+def dashboard() -> str:
+    form = SearchForm()
+    if form.validate_on_submit():
+        cities = [city.strip() for city in form.cities.data.split(",") if city.strip()]
+        job = start_search_job(
+            current_app._get_current_object(),
+            keyword=form.keyword.data.strip(),
+            cities=cities,
+            target_count=form.target_count.data or 1000,
+        )
+        flash(f"Suchjob #{job.id} gestartet", "success")
+        return redirect(url_for("dashboard.dashboard"))
+
+    if request.method == "POST":
+        flash("Bitte Eingaben prüfen.", "error")
+
+    leads = Lead.query.order_by(Lead.score.desc(), Lead.created_at.desc()).all()
+    stats = {
+        "total": len(leads),
+        "new": sum(1 for lead_item in leads if lead_item.status == "new"),
+        "high_score": sum(1 for lead_item in leads if lead_item.score >= 70),
+        "with_website": sum(1 for lead_item in leads if lead_item.website),
+        "with_email": sum(1 for lead_item in leads if lead_item.email),
+        "with_phone": sum(1 for lead_item in leads if lead_item.phone),
+        "impressum_found": sum(1 for lead_item in leads if lead_item.impressum_found),
+        "with_google_rating": sum(
+            1 for lead_item in leads if lead_item.google_rating is not None
+        ),
+    }
+    latest_job = SearchJob.query.order_by(SearchJob.id.desc()).first()
+    return render_template(
+        "dashboard.html",
+        form=form,
+        stats=stats,
+        latest_job=latest_job,
+        leads=leads[:10],
+    )
+
+
+@dashboard_bp.route("/search", methods=["GET", "POST"])
+@limiter.limit("15/hour")
+def search_compat() -> str:
+    return dashboard()
