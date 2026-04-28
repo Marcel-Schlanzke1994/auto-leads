@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from functools import wraps
+
 from flask import Blueprint, current_app, jsonify, request
 
 from app.extensions import db, limiter
@@ -7,6 +9,24 @@ from app.models import Lead, SearchJob
 from app.services.search_runner_service import start_search_job
 
 api_bp = Blueprint("api", __name__, url_prefix="/api")
+
+
+def _require_api_token(view):
+    @wraps(view)
+    def wrapped(*args, **kwargs):
+        header_name = str(current_app.config.get("API_AUTH_HEADER", "X-API-Key"))
+        expected_token = str(current_app.config.get("API_AUTH_TOKEN") or "").strip()
+
+        if not expected_token:
+            return jsonify({"error": "api auth token is not configured"}), 503
+
+        provided_token = str(request.headers.get(header_name) or "").strip()
+        if provided_token != expected_token:
+            return jsonify({"error": "unauthorized"}), 401
+
+        return view(*args, **kwargs)
+
+    return wrapped
 
 
 @api_bp.get("/leads")
@@ -24,9 +44,16 @@ def get_lead(lead_id: int):
 
 
 @api_bp.post("/search/start")
-@limiter.limit("10/hour")
+@_require_api_token
+@limiter.limit("5/minute;30/hour")
 def api_search_start():
-    payload = request.get_json(silent=True) or {}
+    if not request.is_json:
+        return jsonify({"error": "json body required"}), 400
+
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return jsonify({"error": "json object required"}), 400
+
     keyword = str(payload.get("keyword") or "").strip()
     cities_raw = str(payload.get("cities") or "").strip()
     target_count_raw = payload.get("target_count")
@@ -38,10 +65,13 @@ def api_search_start():
     except (ValueError, TypeError):
         return jsonify({"error": "target_count must be an integer"}), 400
 
-    if not keyword or not cities_raw:
+    if not keyword or len(keyword) > 120 or not cities_raw:
         return jsonify({"error": "keyword and cities are required"}), 400
 
     cities = [c.strip() for c in cities_raw.split(",") if c.strip()]
+    if not cities or len(cities) > 25:
+        return jsonify({"error": "cities must contain between 1 and 25 values"}), 400
+
     max_target = int(current_app.config.get("SEARCH_MAX_TARGET_COUNT", 1000))
     bounded_target = max(1, min(target_count, max_target))
     job = start_search_job(

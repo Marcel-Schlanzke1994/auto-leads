@@ -35,12 +35,22 @@ def create_app(test_config: dict | None = None) -> Flask:
     limiter.init_app(app)
     migrate.init_app(app, db)
 
+    # API-Sicherheitsstrategie:
+    # - CSRF wird für den API-Blueprint explizit ausgenommen.
+    # - Schreibende API-Endpoints müssen stattdessen Token-Auth, striktere
+    #   Rate-Limits und Input-Validierung erzwingen (siehe app/routes/api.py).
+    app.config.setdefault("API_REQUIRE_CSRF", False)
+    app.config.setdefault("API_AUTH_HEADER", "X-API-Key")
+    app.config.setdefault("API_AUTH_TOKEN", "")
+
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(leads_bp)
     app.register_blueprint(jobs_bp)
     app.register_blueprint(export_bp)
     app.register_blueprint(api_bp)
     app.register_blueprint(web_compat_bp)
+    if not app.config.get("API_REQUIRE_CSRF", False):
+        csrf.exempt(api_bp)
 
     from app import models  # noqa: F401
 
