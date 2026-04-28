@@ -9,11 +9,12 @@ from urllib.parse import urljoin, urlparse
 
 import requests
 from bs4 import BeautifulSoup
+from flask import current_app, has_app_context
 
 
 DEFAULT_CRAWL_MAX_PAGES = int(os.getenv("CRAWL_MAX_PAGES", "10"))
 DEFAULT_CRAWL_DELAY_SECONDS = float(os.getenv("CRAWL_DELAY_SECONDS", "0.1"))
-DEFAULT_USER_AGENT = os.getenv("AUDIT_USER_AGENT", "auto-leads/3.0 (+website-audit)")
+DEFAULT_USER_AGENT = "auto-leads/3.0 (+website-audit)"
 
 
 @dataclass(slots=True)
@@ -95,7 +96,24 @@ def crawl_domain_pages(
 ) -> CrawlResult:
     max_count = max_pages if max_pages is not None else DEFAULT_CRAWL_MAX_PAGES
     delay = delay_seconds if delay_seconds is not None else DEFAULT_CRAWL_DELAY_SECONDS
-    headers = {"User-Agent": DEFAULT_USER_AGENT}
+    user_agent = DEFAULT_USER_AGENT
+    if has_app_context():
+        max_count = (
+            max_pages
+            if max_pages is not None
+            else int(current_app.config.get("CRAWL_MAX_PAGES", DEFAULT_CRAWL_MAX_PAGES))
+        )
+        delay = (
+            delay_seconds
+            if delay_seconds is not None
+            else float(
+                current_app.config.get(
+                    "CRAWL_DELAY_SECONDS", DEFAULT_CRAWL_DELAY_SECONDS
+                )
+            )
+        )
+        user_agent = current_app.config.get("USER_AGENT", DEFAULT_USER_AGENT)
+    headers = {"User-Agent": user_agent}
 
     queue = deque([base_url])
     for link in _extract_internal_links(seed_soup, base_url):

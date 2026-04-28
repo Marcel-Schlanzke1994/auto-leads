@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import os
+import time
 
 import requests
+from flask import current_app, has_app_context
 
 from app.services.website_fetcher import FetchResult
 
@@ -16,12 +18,22 @@ def extract_page_load_ms(fetch_result: FetchResult) -> int:
 
 
 def analyze_pagespeed(url: str, fetch_result: FetchResult, timeout: float) -> dict:
-    if PSI_API_KEY:
+    psi_api_key = PSI_API_KEY
+    request_timeout = timeout
+    request_delay = 0.0
+    if has_app_context():
+        psi_api_key = current_app.config.get("PAGESPEED_API_KEY", "").strip()
+        policy = current_app.config["EXTERNAL_SERVICE_POLICIES"]["pagespeed"]
+        request_timeout = policy.timeout
+        request_delay = policy.min_interval_seconds
+    if psi_api_key:
         try:
+            if request_delay > 0:
+                time.sleep(request_delay)
             response = requests.get(
                 PSI_API_URL,
-                timeout=timeout,
-                params={"url": url, "strategy": "mobile", "key": PSI_API_KEY},
+                timeout=request_timeout,
+                params={"url": url, "strategy": "mobile", "key": psi_api_key},
             )
             response.raise_for_status()
             payload = response.json()

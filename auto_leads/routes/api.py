@@ -35,7 +35,8 @@ def api_search_start():
         return jsonify({"error": "keyword and cities are required"}), 400
 
     cities = [c.strip() for c in cities_raw.split(",") if c.strip()]
-    bounded_target = max(1, min(target_count, 1000))
+    max_target = int(current_app.config.get("SEARCH_MAX_TARGET_COUNT", 1000))
+    bounded_target = max(1, min(target_count, max_target))
     job = start_search_job(
         current_app._get_current_object(),
         keyword,

@@ -13,26 +13,20 @@ from app.routes.jobs import jobs_bp
 from app.routes.leads import leads_bp
 from auto_leads.routes.api import api_bp
 from auto_leads.routes.web import web_bp
+from config import Config
 
 
 def create_app(test_config: dict | None = None) -> Flask:
     load_dotenv()
     app = Flask(__name__, instance_relative_config=True)
-
-    app.config.update(
-        SECRET_KEY=os.getenv("SECRET_KEY", "replace-with-a-long-random-secret"),
-        SQLALCHEMY_DATABASE_URI=os.getenv("DATABASE_URL", "sqlite:///leads.db"),
-        SQLALCHEMY_TRACK_MODIFICATIONS=False,
-        REQUEST_TIMEOUT=float(os.getenv("REQUEST_TIMEOUT", "8")),
-        GOOGLE_MAPS_API_KEY=os.getenv("GOOGLE_MAPS_API_KEY", ""),
-        PLACES_PROVIDER=os.getenv("PLACES_PROVIDER", "google_places").lower(),
-        APP_HOST=os.getenv("APP_HOST", "127.0.0.1"),
-        APP_PORT=int(os.getenv("APP_PORT", "5000")),
-        MAX_CONTENT_LENGTH=4 * 1024 * 1024,
-    )
+    app.config.from_object(Config)
 
     if test_config:
         app.config.update(test_config)
+    if app.config.get("TESTING") and not app.config.get("SECRET_KEY"):
+        app.config["SECRET_KEY"] = "test-secret-key"
+
+    _validate_security_config(app)
 
     os.makedirs(app.instance_path, exist_ok=True)
 
@@ -60,3 +54,14 @@ def _configure_logging(app: Flask) -> None:
         format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
     )
     app.logger.info("Auto-Leads app initialized")
+
+
+def _validate_security_config(app: Flask) -> None:
+    secret_key = str(app.config.get("SECRET_KEY") or "").strip()
+    insecure_placeholder = "replace-with-a-long-random-secret"
+    is_dev = bool(app.config.get("TESTING")) or Config.is_development_mode()
+    if not is_dev and (not secret_key or secret_key == insecure_placeholder):
+        raise RuntimeError(
+            "SECRET_KEY muss in Produktion gesetzt sein und darf kein "
+            "Default-/Placeholder-Wert sein."
+        )

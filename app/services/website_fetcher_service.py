@@ -6,12 +6,13 @@ from dataclasses import dataclass
 from urllib.parse import urlparse
 
 import requests
+from flask import current_app, has_app_context
 
 from auto_leads.utils import is_private_hostname
 
 
 DEFAULT_TIMEOUT = float(os.getenv("REQUEST_TIMEOUT", "8"))
-DEFAULT_USER_AGENT = os.getenv("AUDIT_USER_AGENT", "auto-leads/3.0 (+website-audit)")
+DEFAULT_USER_AGENT = "auto-leads/3.0 (+website-audit)"
 
 
 @dataclass(slots=True)
@@ -55,6 +56,12 @@ def fetch_website(
 ) -> FetchResult:
     request_timeout = timeout if timeout is not None else DEFAULT_TIMEOUT
     ua = user_agent or DEFAULT_USER_AGENT
+    request_delay = 0.0
+    if has_app_context():
+        policy = current_app.config["EXTERNAL_SERVICE_POLICIES"]["website_fetch"]
+        request_timeout = timeout if timeout is not None else policy.timeout
+        ua = user_agent or current_app.config.get("USER_AGENT", DEFAULT_USER_AGENT)
+        request_delay = policy.min_interval_seconds
     normalized_url = normalize_url(url)
 
     http = session or requests.Session()
@@ -62,6 +69,8 @@ def fetch_website(
     used_https = normalized_url.lower().startswith("https://")
 
     try:
+        if request_delay > 0:
+            time.sleep(request_delay)
         response = http.get(
             normalized_url,
             timeout=request_timeout,
@@ -76,6 +85,8 @@ def fetch_website(
             )
             if parsed_normalized.query:
                 fallback_url = f"{fallback_url}?{parsed_normalized.query}"
+            if request_delay > 0:
+                time.sleep(request_delay)
             response = http.get(
                 fallback_url,
                 timeout=request_timeout,

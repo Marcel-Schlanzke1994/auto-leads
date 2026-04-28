@@ -31,9 +31,15 @@ class SearchBatch:
 
 
 class GooglePlacesClient:
-    def __init__(self, api_key: str, timeout: float = 8.0):
+    def __init__(
+        self,
+        api_key: str,
+        timeout: float = 8.0,
+        min_interval_seconds: float = 2.1,
+    ):
         self.api_key = api_key
         self.timeout = timeout
+        self.min_interval_seconds = min_interval_seconds
         self.session = requests.Session()
         self.base = "https://places.googleapis.com/v1"
 
@@ -74,7 +80,7 @@ class GooglePlacesClient:
             page_token = data.get("nextPageToken")
             if not page_token or not places:
                 break
-            time.sleep(2.1)
+            time.sleep(self.min_interval_seconds)
         return SearchBatch(
             place_ids=all_ids[:max_results], total_found_raw=total_found_raw
         )
