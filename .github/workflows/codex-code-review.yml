@@ -1,0 +1,83 @@
+name: Codex Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  codex-review:
+    name: Automated PR Review (Codex)
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (
+        github.event.pull_request.head.repo.fork == false &&
+        secrets.OPENAI_API_KEY != ''
+      )
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Build diff summary
+        id: diff
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            git fetch origin "${{ github.base_ref }}" --depth=1
+            git diff --name-only "origin/${{ github.base_ref }}...HEAD" > changed_files.txt
+          else
+            git diff --name-only HEAD~1...HEAD > changed_files.txt || true
+          fi
+          echo "changed<<EOF" >> $GITHUB_OUTPUT
+          cat changed_files.txt >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Call OpenAI (review draft)
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          if [ -z "$OPENAI_API_KEY" ]; then
+            echo "OPENAI_API_KEY missing; skip Codex review."
+            exit 0
+          fi
+          python - <<'PY'
+          import json
+          import os
+          import urllib.request
+
+          payload = {
+              "model": "gpt-4.1-mini",
+              "input": "Review this pull request changed-file list and provide concise risks and test suggestions:\n" + open('changed_files.txt', 'r', encoding='utf-8').read(),
+          }
+          req = urllib.request.Request(
+              "https://api.openai.com/v1/responses",
+              data=json.dumps(payload).encode("utf-8"),
+              headers={
+                  "Authorization": f"Bearer {os.environ['OPENAI_API_KEY']}",
+                  "Content-Type": "application/json",
+              },
+              method="POST",
+          )
+          with urllib.request.urlopen(req) as resp:
+              data = json.loads(resp.read().decode("utf-8"))
+          text = ""
+          for item in data.get("output", []):
+              for c in item.get("content", []):
+                  if c.get("type") == "output_text":
+                      text += c.get("text", "") + "\n"
+          open("codex_review.txt", "w", encoding="utf-8").write(text.strip() or "No review output")
+          PY
+
+      - name: Upload review artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: codex-review
+          path: codex_review.txt

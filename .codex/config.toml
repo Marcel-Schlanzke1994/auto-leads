@@ -1,0 +1,32 @@
+# Codex workspace configuration for auto-leads
+
+[model]
+name = "gpt-5.3-codex"
+reasoning = "balanced"
+
+[sandbox]
+mode = "danger-full-access"
+network = true
+
+[workflow]
+default_branch = "main"
+require_plan_for_large_changes = true
+run_tests_after_code_changes = true
+allow_docs_only_skip_tests = true
+
+[workflow.commands]
+test = "pytest"
+lint_black = "black --check ."
+lint_flake8 = "flake8"
+start_app = "python run.py"
+
+[security]
+secret_files = [".env", ".env.*"]
+forbid_hardcoded_secrets = true
+require_github_secrets_for_ci = true
+
+[docs]
+architecture = "docs/ARCHITECTURE.md"
+operations = "docs/OPERATIONS.md"
+roadmap = "docs/ROADMAP.md"
+execplan = "docs/execplans/auto-lead-system-execplan.md"

@@ -1,0 +1,90 @@
+name: Codex Auto Fix
+
+on:
+  pull_request:
+    types: [labeled]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-fix:
+    runs-on: ubuntu-latest
+    if: >-
+      (
+        github.event_name == 'pull_request' &&
+        github.event.label.name == 'codex-autofix' &&
+        github.event.pull_request.head.repo.fork == false &&
+        secrets.OPENAI_API_KEY != ''
+      ) ||
+      github.event_name == 'workflow_dispatch'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Apply safe auto-fixes (format)
+        run: |
+          black . || true
+
+      - name: Run lint checks
+        run: |
+          black --check .
+          flake8
+
+      - name: Optional Codex suggestion call
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          if [ -z "$OPENAI_API_KEY" ]; then
+            echo "OPENAI_API_KEY missing; skip Codex suggestion call."
+            exit 0
+          fi
+          python - <<'PY'
+          import json
+          import os
+          import urllib.request
+
+          payload = {
+              "model": "gpt-4.1-mini",
+              "input": "Suggest small safe Python refactoring checks after formatting-only autofix.",
+          }
+          req = urllib.request.Request(
+              "https://api.openai.com/v1/responses",
+              data=json.dumps(payload).encode("utf-8"),
+              headers={
+                  "Authorization": f"Bearer {os.environ['OPENAI_API_KEY']}",
+                  "Content-Type": "application/json",
+              },
+              method="POST",
+          )
+          with urllib.request.urlopen(req) as resp:
+              _ = resp.read()
+          PY
+
+      - name: Create Pull Request if changes exist
+        uses: peter-evans/create-pull-request@v6
+        with:
+          commit-message: "chore: codex auto-fix formatting"
+          title: "chore: codex auto-fix formatting"
+          body: |
+            Automated formatting/lint auto-fix from Codex workflow.
+            - Triggered by `codex-autofix` label or manual dispatch.
+            - Uses `OPENAI_API_KEY` only from GitHub Secrets.
+          branch: chore/codex-auto-fix
+          delete-branch: true

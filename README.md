@@ -28,6 +28,14 @@ pip install -r requirements.txt
 cp .env.example .env
 ```
 
+## Datenbank initialisieren / migrieren
+
+```bash
+flask db upgrade
+```
+
+> Hinweis: Standard-URL ist `sqlite:///leads.db`.
+
 ## `.env`
 
 ```env
@@ -56,6 +64,20 @@ PAGESPEED_TIMEOUT=8
 PAGESPEED_MIN_INTERVAL_SECONDS=0
 ```
 
+## Start (validiert)
+
+```bash
+python run.py
+```
+
+Dann im Browser öffnen: `http://127.0.0.1:5000`.
+
+## Alternative Starts
+
+```bash
+flask --app run:app run --host 127.0.0.1 --port 5000
+```
+
 ## Security-Hinweise
 
 - **`SECRET_KEY` muss außerhalb von Entwicklung/Test gesetzt werden**; die App startet sonst absichtlich nicht.
@@ -67,15 +89,7 @@ PAGESPEED_MIN_INTERVAL_SECONDS=0
 
 - Die Nutzung von Google Places und PageSpeed unterliegt den jeweiligen Google-AGB und Quoten.
 - Beim Crawlen fremder Websites sind lokale Gesetze, Nutzungsbedingungen sowie robots-/Rate-Limit-Vorgaben zu beachten.
-- Das Tool sollte nur für rechtmäßige B2B-Lead-Prozesse eingesetzt werden; Datenschutzpflichten (z. B. DSGVO) bleiben in Ihrer Verantwortung.
-
-## Start
-
-```bash
-python app.py
-```
-
-Dann im Browser öffnen: `http://127.0.0.1:5000`.
+- Das Tool sollte nur für rechtmäßige B2B-Lead-Prozesse eingesetzt werden; Datenschutzpflichten (z. B. DSGVO) bleiben in Ihrer Verantwortung.
 
 ## API-Endpunkte
 
