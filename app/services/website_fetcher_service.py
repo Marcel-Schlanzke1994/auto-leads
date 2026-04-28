@@ -33,6 +33,10 @@ class FetchResult:
     used_https: bool
 
 
+class WebsiteFetchSecurityError(ValueError):
+    """Raised when URL safety checks fail during website fetching."""
+
+
 def normalize_url(url: str) -> str:
     value = (url or "").strip()
     if not value:
@@ -44,8 +48,20 @@ def normalize_url(url: str) -> str:
     if not parsed.hostname:
         raise ValueError("Ungültige URL")
     if is_private_hostname(parsed.hostname):
-        raise ValueError("Private/local targets are blocked")
+        raise WebsiteFetchSecurityError("Private/local targets are blocked")
     return value
+
+
+def _ensure_public_response_chain(response: requests.Response) -> None:
+    redirect_urls = [hop.url for hop in response.history]
+    redirect_urls.append(response.url)
+
+    for checked_url in redirect_urls:
+        hostname = urlparse(checked_url).hostname
+        if not hostname or is_private_hostname(hostname):
+            raise WebsiteFetchSecurityError(
+                "Redirected to private/local targets are blocked"
+            )
 
 
 def fetch_website(
@@ -99,6 +115,7 @@ def fetch_website(
             raise
 
     response.raise_for_status()
+    _ensure_public_response_chain(response)
     redirect_history = [
         RedirectHop(url=hop.url, status_code=hop.status_code)
         for hop in response.history
