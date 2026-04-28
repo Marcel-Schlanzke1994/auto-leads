@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 from flask import (
     Blueprint,
     current_app,
@@ -11,7 +13,10 @@ from flask import (
 )
 
 from app.models import Lead
-from app.services.lead_score_service import calculate_lead_score
+from app.services.lead_score_service import (
+    calculate_lead_score,
+    calculate_lead_score_details,
+)
 from app.services.website_audit_service import audit_website, persist_audit_result
 from auto_leads.extensions import db
 from auto_leads.forms import StatusForm
@@ -89,8 +94,10 @@ def rerun_audit(lead_id: int):
         if audit.legal_form:
             lead.legal_form = audit.legal_form
         persist_audit_result(lead, audit)
-        lead.score, reasons = calculate_lead_score(lead)
-        lead.score_reasons = "\n".join(reasons)
+        lead.score, _ = calculate_lead_score(lead)
+        lead.score_reasons = json.dumps(
+            calculate_lead_score_details(lead), ensure_ascii=False
+        )
         db.session.commit()
         flash("Audit erneut durchgeführt", "success")
     except Exception as exc:  # noqa: BLE001

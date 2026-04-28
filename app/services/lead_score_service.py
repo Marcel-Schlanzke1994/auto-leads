@@ -1,49 +1,224 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+from typing import Any
+
 from app.models import Lead
 
 
+@dataclass(frozen=True)
+class ScoreRuleResult:
+    rule_id: str
+    dimension: str
+    weight: int
+    points: int
+    finding: str
+    triggered: bool
+    critical: bool = False
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "rule_id": self.rule_id,
+            "dimension": self.dimension,
+            "weight": self.weight,
+            "points": self.points,
+            "finding": self.finding,
+            "triggered": self.triggered,
+            "critical": self.critical,
+        }
+
+
+def _build_rule_results(lead: Lead) -> list[ScoreRuleResult]:
+    review_count = lead.review_count or 0
+
+    return [
+        ScoreRuleResult(
+            rule_id="REVIEW_COUNT_LOW",
+            dimension="reputation",
+            weight=22,
+            points=22 if review_count < 30 else 0,
+            finding=f"review_count={review_count}",
+            triggered=review_count < 30,
+        ),
+        ScoreRuleResult(
+            rule_id="REVIEW_COUNT_MEDIUM",
+            dimension="reputation",
+            weight=10,
+            points=10 if 30 <= review_count < 100 else 0,
+            finding=f"review_count={review_count}",
+            triggered=30 <= review_count < 100,
+        ),
+        ScoreRuleResult(
+            rule_id="RATING_MISSING",
+            dimension="reputation",
+            weight=12,
+            points=12 if lead.google_rating is None else 0,
+            finding=f"google_rating={lead.google_rating}",
+            triggered=lead.google_rating is None,
+        ),
+        ScoreRuleResult(
+            rule_id="RATING_LOW",
+            dimension="reputation",
+            weight=18,
+            points=(
+                18 if lead.google_rating is not None and lead.google_rating < 4.2 else 0
+            ),
+            finding=f"google_rating={lead.google_rating}",
+            triggered=lead.google_rating is not None and lead.google_rating < 4.2,
+        ),
+        ScoreRuleResult(
+            rule_id="WEBSITE_MISSING",
+            dimension="website_presence",
+            weight=45,
+            points=45 if not lead.website else 0,
+            finding=f"website_present={bool(lead.website)}",
+            triggered=not lead.website,
+            critical=True,
+        ),
+        ScoreRuleResult(
+            rule_id="EMAIL_MISSING",
+            dimension="contact",
+            weight=20,
+            points=20 if not lead.email else 0,
+            finding=f"email_present={bool(lead.email)}",
+            triggered=not lead.email,
+        ),
+        ScoreRuleResult(
+            rule_id="PHONE_MISSING",
+            dimension="contact",
+            weight=20,
+            points=20 if not lead.phone else 0,
+            finding=f"phone_present={bool(lead.phone)}",
+            triggered=not lead.phone,
+        ),
+        ScoreRuleResult(
+            rule_id="IMPRESSUM_MISSING",
+            dimension="website_presence",
+            weight=30,
+            points=30 if lead.website and not lead.impressum_found else 0,
+            finding=(
+                f"website_present={bool(lead.website)};"
+                f"impressum_found={lead.impressum_found}"
+            ),
+            triggered=bool(lead.website) and not lead.impressum_found,
+            critical=True,
+        ),
+        ScoreRuleResult(
+            rule_id="META_DESCRIPTION_MISSING",
+            dimension="content",
+            weight=18,
+            points=18 if not lead.meta_description else 0,
+            finding=f"meta_description_present={bool(lead.meta_description)}",
+            triggered=not lead.meta_description,
+        ),
+        ScoreRuleResult(
+            rule_id="H1_MISSING",
+            dimension="content",
+            weight=18,
+            points=18 if not lead.has_h1 else 0,
+            finding=f"has_h1={lead.has_h1}",
+            triggered=not lead.has_h1,
+        ),
+        ScoreRuleResult(
+            rule_id="CTA_MISSING",
+            dimension="content",
+            weight=24,
+            points=24 if not lead.has_cta else 0,
+            finding=f"has_cta={lead.has_cta}",
+            triggered=not lead.has_cta,
+        ),
+        ScoreRuleResult(
+            rule_id="SLOW_PAGE_SPEED",
+            dimension="technical",
+            weight=28,
+            points=28 if lead.page_load_ms and lead.page_load_ms > 2500 else 0,
+            finding=f"page_load_ms={lead.page_load_ms}",
+            triggered=bool(lead.page_load_ms and lead.page_load_ms > 2500),
+        ),
+        ScoreRuleResult(
+            rule_id="MOBILE_SIGNAL_WEAK",
+            dimension="technical",
+            weight=24,
+            points=24 if lead.website and not lead.mobile_signals else 0,
+            finding=(
+                f"website_present={bool(lead.website)};"
+                f"mobile_signals={lead.mobile_signals}"
+            ),
+            triggered=bool(lead.website) and not lead.mobile_signals,
+        ),
+        ScoreRuleResult(
+            rule_id="CONTACT_INFO_MISSING_ON_SITE",
+            dimension="contact",
+            weight=30,
+            points=30 if lead.website and not lead.has_contact_info else 0,
+            finding=(
+                f"website_present={bool(lead.website)};"
+                f"has_contact_info={lead.has_contact_info}"
+            ),
+            triggered=bool(lead.website) and not lead.has_contact_info,
+            critical=True,
+        ),
+    ]
+
+
+def _subscore(rule_results: list[ScoreRuleResult], dimension: str) -> int:
+    dimension_rules = [rule for rule in rule_results if rule.dimension == dimension]
+    if not dimension_rules:
+        return 0
+    max_points = sum(rule.weight for rule in dimension_rules)
+    gained_points = sum(rule.points for rule in dimension_rules)
+    return round((gained_points / max_points) * 100)
+
+
+def calculate_lead_score_details(lead: Lead) -> dict[str, Any]:
+    rules = _build_rule_results(lead)
+    dimensions = [
+        "reputation",
+        "website_presence",
+        "contact",
+        "content",
+        "technical",
+    ]
+    subscores = {dimension: _subscore(rules, dimension) for dimension in dimensions}
+
+    weight_map = {
+        "reputation": 0.18,
+        "website_presence": 0.27,
+        "contact": 0.18,
+        "content": 0.17,
+        "technical": 0.20,
+    }
+    lead_potential_score = round(
+        sum(subscores[dimension] * weight for dimension, weight in weight_map.items())
+    )
+
+    critical_issues = [
+        {
+            "rule_id": rule.rule_id,
+            "dimension": rule.dimension,
+            "weight": rule.weight,
+            "finding": rule.finding,
+            "severity": "critical",
+        }
+        for rule in rules
+        if rule.triggered and rule.critical
+    ]
+
+    triggered_rules = [rule for rule in rules if rule.triggered]
+    reason_lines = [
+        f"[{rule.dimension}] {rule.rule_id} (+{rule.points})"
+        for rule in triggered_rules
+    ]
+
+    return {
+        "lead_potential_score": min(max(lead_potential_score, 0), 100),
+        "subscores": subscores,
+        "critical_issues": critical_issues,
+        "rules": [rule.to_dict() for rule in rules],
+        "reason_lines": reason_lines,
+    }
+
+
 def calculate_lead_score(lead: Lead) -> tuple[int, list[str]]:
-    score = 10
-    reasons = ["Basis-Score +10"]
-    if (lead.review_count or 0) < 30:
-        score += 16
-        reasons.append("Wenig Reviews (<30) +16")
-    elif (lead.review_count or 0) < 100:
-        score += 8
-        reasons.append("Moderate Reviews (<100) +8")
-    if lead.google_rating is None:
-        score += 7
-        reasons.append("Google-Rating fehlt +7")
-    elif lead.google_rating < 4.2:
-        score += 12
-        reasons.append("Google-Sternebewertung niedrig (<4.2) +12")
-    if not lead.website:
-        score += 20
-        reasons.append("Website fehlt +20")
-    else:
-        reasons.append("Website vorhanden +0")
-    if not lead.email:
-        score += 8
-        reasons.append("E-Mail fehlt +8")
-    if not lead.phone:
-        score += 8
-        reasons.append("Keine Telefonnummer +8")
-    if lead.website and not lead.impressum_found:
-        score += 14
-        reasons.append("Impressum nicht gefunden +14")
-    elif lead.impressum_found:
-        reasons.append("Impressum gefunden +0")
-    if not lead.meta_description:
-        score += 5
-        reasons.append("Meta Description fehlt +5")
-    if not lead.has_h1:
-        score += 5
-        reasons.append("H1 fehlt +5")
-    if not lead.has_cta:
-        score += 8
-        reasons.append("CTA fehlt +8")
-    if lead.page_load_ms and lead.page_load_ms > 2500:
-        score += 7
-        reasons.append("Langsame Website (>2.5s) +7")
-    return min(score, 100), reasons
+    details = calculate_lead_score_details(lead)
+    return details["lead_potential_score"], details["reason_lines"]
