@@ -30,6 +30,7 @@ from app.services.contact_form_service import (
     detect_contact_form_urls,
     merge_contact_form_urls,
 )
+from app.services.browser.playwright_analyzer import analyze_contact_forms
 from app.services.lead_score_service import (
     calculate_lead_score,
     calculate_lead_score_details,
@@ -112,6 +113,14 @@ def _load_latest_audit_context(
         return None, []
     audit_issues = AuditIssue.query.filter_by(audit_result_id=latest_audit.id).all()
     return latest_audit, audit_issues
+
+
+def _read_playwright_analysis(lead: Lead) -> dict:
+    payload = lead.raw_place_json or {}
+    if not isinstance(payload, dict):
+        return {}
+    value = payload.get("playwright_contact_form_analysis")
+    return value if isinstance(value, dict) else {}
 
 
 def build_lead_query_from_args(args):
@@ -315,6 +324,7 @@ def lead_detail(lead_id: int) -> str:
     return render_template(
         "lead_detail.html",
         lead=lead,
+        playwright_analysis=_read_playwright_analysis(lead),
         status_form=status_form,
         status_labels=OUTREACH_STATUS_LABELS,
         latest_audit=latest_audit,
@@ -325,6 +335,34 @@ def lead_detail(lead_id: int) -> str:
         opt_out_match=opt_out_match,
         blacklist_match=blacklist_match,
     )
+
+
+@leads_bp.post("/<int:lead_id>/analyze-contact-form")
+@limiter.limit("10/hour")
+def analyze_contact_form(lead_id: int):
+    lead = db.session.get(Lead, lead_id)
+    if not lead:
+        flash("Lead nicht gefunden", "error")
+        return redirect(url_for("leads.leads_list"))
+    if not lead.website:
+        flash("Keine Website vorhanden", "error")
+        return redirect(url_for("leads.lead_detail", lead_id=lead.id))
+
+    result = analyze_contact_forms(lead.website)
+    payload = lead.raw_place_json if isinstance(lead.raw_place_json, dict) else {}
+    payload["playwright_contact_form_analysis"] = {
+        "status": result.status,
+        "contact_page_url": result.contact_page_url,
+        "forms_found": len(result.forms_found),
+        "fields_found": len(result.fields),
+        "recommendations": result.recommendations,
+        "errors": result.errors,
+        "metadata": result.metadata,
+    }
+    lead.raw_place_json = payload
+    db.session.commit()
+    flash("Kontaktformular-Analyse gespeichert.", "success")
+    return redirect(url_for("leads.lead_detail", lead_id=lead.id))
 
 
 @leads_bp.post("/<int:lead_id>/status")

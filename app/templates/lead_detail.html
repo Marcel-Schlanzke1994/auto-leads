@@ -31,6 +31,10 @@
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
     <button class="btn" type="submit">Audit erneut starten</button>
   </form>
+  <form method="post" action="{{ url_for('leads.analyze_contact_form', lead_id=lead.id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+    <button class="btn" type="submit">Kontaktformular analysieren</button>
+  </form>
 </section>
 
 <section class="panel">
@@ -150,6 +154,20 @@
     <label>Grund <input type="text" name="reason" maxlength="255"></label>
     <button class="btn" type="submit">Kontakt sperren</button>
   </form>
+</section>
+
+<section class="panel">
+  <h3>Playwright Kontaktformular-Analyse</h3>
+  {% if playwright_analysis %}
+  <p><strong>Status:</strong> {{ playwright_analysis.status or '-' }}</p>
+  <p><strong>Kontaktseite:</strong> {{ playwright_analysis.contact_page_url or '-' }}</p>
+  <p><strong>Formulare:</strong> {{ playwright_analysis.forms_found or 0 }} | <strong>Felder:</strong> {{ playwright_analysis.fields_found or 0 }}</p>
+  {% if playwright_analysis.errors %}
+  <ul>{% for err in playwright_analysis.errors %}<li>{{ err }}</li>{% endfor %}</ul>
+  {% endif %}
+  {% else %}
+  <p>Noch keine Playwright-Analyse gespeichert.</p>
+  {% endif %}
 </section>
 
 <section class="panel">
