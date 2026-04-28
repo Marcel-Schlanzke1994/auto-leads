@@ -43,6 +43,28 @@ Beiträge sollten diese drei Artefakte nicht widersprüchlich ändern; Plan-/Wor
 4. Doku aktualisieren (README/ARCHITECTURE/OPERATIONS/ROADMAP), falls relevant.
 5. PR mit Risiko- und Rollback-Hinweis öffnen.
 
+
+## Codex-Review im Pull Request lesen und bewerten
+Der Workflow `.github/workflows/codex-code-review.yml` erzeugt für interne Pull Requests automatisch eine Codex-Rückmeldung und schreibt sie als PR-Kommentar.
+
+Ablauf für Reviewer:
+1. PR öffnen und den Kommentar **„🤖 Codex Code Review“** suchen.
+2. Inhalt als Hinweis nutzen (Risiken, Testideen), nicht als alleinige Freigabegrundlage.
+3. Prüfen, ob vorgeschlagene Risiken im Diff tatsächlich zutreffen.
+4. Prüfen, ob Testvorschläge im PR umgesetzt sind oder begründet abgelehnt wurden.
+5. Bei Fallback-Hinweis (leere Antwort) Artefakt `codex-review` öffnen und bei Bedarf Workflow neu ausführen.
+
+Bewertungsmaßstab:
+- **Signalqualität**: Konkrete, dateibezogene Hinweise statt allgemeiner Aussagen.
+- **Sicherheitsrelevanz**: Hinweise zu Secrets, Berechtigungen, Input-Validierung und Datenabfluss priorisieren.
+- **Umsetzbarkeit**: Vorschläge sollen mit vorhandener Architektur (App-Factory, Blueprints, Services) vereinbar sein.
+- **Nachvollziehbarkeit**: Entscheidung im Review dokumentieren (übernommen / verworfen mit kurzer Begründung).
+
+Guardrails im Workflow:
+- Kommentar wird nur bei **internen PRs** erstellt (keine Fork-PRs).
+- Es werden **keine Secrets** in Logs oder Kommentar ausgegeben.
+- Bei leerem Modell-Output wird ein klarer **Fallback-Kommentar** gepostet.
+
 ## Review-Checkliste
 - [ ] Kein Secret im Diff.
 - [ ] Architektur konsistent (Blueprints, Services, Models).
