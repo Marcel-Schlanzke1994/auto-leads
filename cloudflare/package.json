@@ -5,7 +5,9 @@
   "description": "Optional Cloudflare Worker foundation for auto-leads.",
   "scripts": {
     "dev": "wrangler dev --config wrangler.example.toml",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "check": "npm run typecheck",
+    "dry-run": "wrangler deploy --dry-run --config wrangler.example.toml"
   },
   "devDependencies": {
     "typescript": "^5.8.0",

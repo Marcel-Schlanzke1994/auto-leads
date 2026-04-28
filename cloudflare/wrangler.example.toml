@@ -1,18 +1,80 @@
-# Example config only. Keep real values in local wrangler.toml (gitignored).
-# Never commit production IDs, API tokens, or domains.
+# Example-only Wrangler configuration for local/stage/prod templates.
+# Copy to cloudflare/wrangler.toml for local use:
+#   cp wrangler.example.toml wrangler.toml
+# IMPORTANT: wrangler.toml is gitignored and must never be committed.
+
 name = "auto-leads-worker"
 main = "src/index.ts"
 compatibility_date = "2026-04-28"
 workers_dev = true
 
-[vars]
-VERSION = "0.1.0"
+# Keep flags empty unless a specific feature requires them.
+# compatibility_flags = []
 
+[vars]
+VERSION = "local-dev"
+AUTO_LEADS_ENV = "development"
+LOG_LEVEL = "info"
+
+# Durable Objects binding used by POST /rate-limit/check.
+# Class name must match src/rate_limit_object.ts export.
 [[durable_objects.bindings]]
 name = "OUTREACH_RATE_LIMITER"
 class_name = "OutreachRateLimiter"
 
-# Example-only migration for local/prototype use.
+# Safe example migration tags; rename carefully when schema/classes change.
 [[migrations]]
-tag = "v1"
+tag = "do-rate-limiter-v1-example"
+new_sqlite_classes = ["OutreachRateLimiter"]
+
+[env.dev]
+workers_dev = true
+
+[env.dev.vars]
+VERSION = "dev"
+AUTO_LEADS_ENV = "development"
+LOG_LEVEL = "debug"
+
+[[env.dev.durable_objects.bindings]]
+name = "OUTREACH_RATE_LIMITER"
+class_name = "OutreachRateLimiter"
+
+[[env.dev.migrations]]
+tag = "do-rate-limiter-v1-dev-example"
+new_sqlite_classes = ["OutreachRateLimiter"]
+
+[env.stage]
+workers_dev = true
+# Example placeholder route only; do not use real domains in this template.
+# routes = [{ pattern = "stage-worker.example.invalid/*", zone_name = "example.invalid" }]
+
+[env.stage.vars]
+VERSION = "stage"
+AUTO_LEADS_ENV = "staging"
+LOG_LEVEL = "info"
+
+[[env.stage.durable_objects.bindings]]
+name = "OUTREACH_RATE_LIMITER"
+class_name = "OutreachRateLimiter"
+
+[[env.stage.migrations]]
+tag = "do-rate-limiter-v1-stage-example"
+new_sqlite_classes = ["OutreachRateLimiter"]
+
+[env.prod]
+workers_dev = false
+# Example placeholder route only; do not use real domains in this template.
+# routes = [{ pattern = "worker.example.invalid/*", zone_name = "example.invalid" }]
+
+[env.prod.vars]
+VERSION = "prod"
+AUTO_LEADS_ENV = "production"
+LOG_LEVEL = "warn"
+
+[[env.prod.durable_objects.bindings]]
+name = "OUTREACH_RATE_LIMITER"
+class_name = "OutreachRateLimiter"
+
+[[env.prod.migrations]]
+tag = "do-rate-limiter-v1-prod-example"
 new_sqlite_classes = ["OutreachRateLimiter"]
