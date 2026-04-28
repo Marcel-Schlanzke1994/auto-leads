@@ -8,17 +8,26 @@ Dieser Ordner enthält eine **optionale** Cloudflare-Foundation für spätere Ed
 - Keine Pflichtabhängigkeit auf Cloudflare.
 - Keine echten Secrets/IDs/Tokens im Repository.
 - Kein E-Mail-Versand, kein Scraping, kein Lead-Datenzugriff.
-- Durable Objects sind in dieser Phase nur Prototyp/Architektur.
+- Kein Zugriff auf lokale DB aus dem Worker.
+- Keine personenbezogenen Logs (keine E-Mail-Adressen, Lead-Inhalte, Draft-Texte).
 
-## Enthalten
+## Worker Best Practices (angewendet)
 
-- `src/index.ts`: Worker-Prototyp mit:
-  - `GET /health`
-  - `GET /version`
-  - `POST /rate-limit/check` (Prototyp)
-- `src/rate_limit_object.ts`: Durable Object `OutreachRateLimiter`.
-- `wrangler.example.toml`: sichere Beispielkonfiguration inkl. Durable-Object-Binding.
-- `package.json` + `tsconfig.json`: lokale Entwicklung/Typecheck.
+- Typed Contracts (`src/types.ts`) für Env, Request/Response-Typen.
+- Zentrale Response-Helper (`src/responses.ts`) mit Security-Headern.
+- Zentrales Error-Handling (`src/errors.ts`) ohne Stacktraces im Response-Body.
+- Defensive Request-Validierung für `POST /rate-limit/check` (Methode, Content-Type, Payload-Größe, Feldgrenzen).
+- Optionale DO-Bindings: Worker bleibt lauffähig, Cloudflare bleibt optional.
+
+## Endpunkte
+
+- `GET /health`
+- `GET /version`
+- `POST /rate-limit/check`
+
+### Rate-Limit Hinweis
+
+`key` sollte als **Hash/technische ID** übergeben werden (kein Klartext mit PII wie E-Mail-Adressen).
 
 ## Lokale Nutzung (optional)
 
@@ -29,35 +38,4 @@ npm run dev
 npm run typecheck
 ```
 
-> Hinweis: Worker-Tests lokal nur nach `npm install`.
-
-## Beispiel für Rate-Limit-Prototyp
-
-```bash
-curl -X POST "http://127.0.0.1:8787/rate-limit/check" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "scope": "domain",
-    "key": "example.com-hash-or-id",
-    "limit": 5,
-    "windowSeconds": 60
-  }'
-```
-
-Beispielantwort:
-
-```json
-{
-  "allowed": true,
-  "remaining": 4,
-  "resetAt": "2026-04-28T12:00:00.000Z",
-  "scope": "domain",
-  "key": "example.com-hash-or-id"
-}
-```
-
-## Sicherheit / Produktivnutzung
-
-- Kein produktiver Einsatz ohne eigene Cloudflare-Konfiguration.
-- Keine echten IDs/Tokens im Beispiel.
-- Kein automatischer Versandpfad und kein Bulk-Send.
+> Kein Deployment in dieser Phase.
