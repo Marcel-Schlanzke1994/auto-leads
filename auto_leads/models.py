@@ -1,3 +1,3 @@
-from app.models import Lead, SearchJob
+from app.models import AuditIssue, AuditResult, Lead, SearchJob
 
-__all__ = ["Lead", "SearchJob"]
+__all__ = ["Lead", "SearchJob", "AuditResult", "AuditIssue"]
