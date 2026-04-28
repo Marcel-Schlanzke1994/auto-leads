@@ -13,7 +13,11 @@ from app.services.duplicate_service import (
 SUPPORTED_CHANNELS = {"email", "contact_form", "phone_script"}
 DEFAULT_LANGUAGE = "de"
 FIXED_SIGNATURE = (
-    "Freundliche Grüße\n" "Marcel Schlanzke\n" "auto-leads\n" "kontakt@auto-leads.de"
+    "Freundliche Grüße\n"
+    "Marcel Schlanzke\n"
+    "SEO-Analyse & Website-Optimierung\n"
+    "marcel-schlanzke.de\n"
+    "kontakt@marcel-schlanzke.de"
 )
 
 
@@ -192,14 +196,15 @@ def _build_channel_draft(
     company = lead.company_name or "Ihr Unternehmen"
 
     if channel == "email":
-        subject = f"Kurzer Website-Impuls für {company}"
+        subject = f"Kurzer Audit-Impuls für {company}"
         body = (
             f"Hallo {company}-Team,\n\n"
-            "ich habe mir Ihre Website kurz angesehen und ein paar "
-            "konkrete Potenziale gefunden.\n"
+            "ich habe mir Ihre Website in einem Kurz-Audit angesehen. "
+            "Dabei sind konkrete Hebel aufgefallen, die Sichtbarkeit und "
+            "Anfragen verbessern können:\n"
             f"{personalization}\n\n"
-            "Wenn Sie möchten, bereiten wir daraus eine priorisierte "
-            "30-Tage-Maßnahmenliste vor.\n\n"
+            "Wenn Sie möchten, sende ich Ihnen daraus eine kompakte "
+            "Priorisierung mit den nächsten sinnvollen Schritten.\n\n"
             f"{FIXED_SIGNATURE}"
         )
         return subject, body
@@ -207,20 +212,22 @@ def _build_channel_draft(
     if channel == "contact_form":
         body = (
             f"Guten Tag {company},\n\n"
-            "beim Kurz-Audit Ihrer Website sind uns Optimierungschancen aufgefallen:\n"
+            "in einem Kurz-Audit Ihrer Website sind uns klare "
+            "Optimierungspotenziale aufgefallen:\n"
             f"{personalization}\n\n"
-            "Gerne senden wir Ihnen eine kompakte Priorisierung per E-Mail.\n\n"
+            "Gerne sende ich Ihnen eine kurze Priorisierung mit konkreten "
+            "Empfehlungen für die ersten Schritte.\n\n"
             f"{FIXED_SIGNATURE}"
         )
         return None, body
 
     phone_script = (
-        f"Hallo, hier ist Marcel Schlanzke von auto-leads. "
+        f"Hallo, hier ist Marcel Schlanzke. "
         f"Ich rufe wegen {company} an. "
-        "Wir haben einen kurzen Website-Check durchgeführt und 2-3 "
-        "schnelle Hebel identifiziert: "
+        "In einem Kurz-Audit sind uns ein paar konkrete Optimierungshebel "
+        "aufgefallen: "
         f"{_inline_personalization(personalization)}. "
-        "Darf ich Ihnen die Prioritätenliste an kontakt@auto-leads.de senden?"
+        "Darf ich Ihnen die kurze Zusammenfassung per E-Mail senden?"
     )
     return None, phone_script
 
@@ -233,32 +240,73 @@ def _build_personalization(
     if not audit_result and not audit_issues:
         return _fallback_personalization(lead)
 
-    hints: list[str] = []
+    trigger_hints: list[str] = []
+    context_hints: list[str] = []
 
     if audit_result and audit_result.score_performance is not None:
-        hints.append(
-            "- Performance-Score bei ca. "
+        context_hints.append(
+            "- Gesamt-Performance-Score bei ca. "
             f"{round(audit_result.score_performance * 100)}/100"
         )
 
     if audit_result and audit_result.score_seo is not None:
-        hints.append(f"- SEO-Score bei ca. {round(audit_result.score_seo * 100)}/100")
+        context_hints.append(
+            f"- SEO-Score bei ca. {round(audit_result.score_seo * 100)}/100"
+        )
 
     if audit_result and audit_result.cwv_lcp_ms:
-        hints.append(f"- LCP liegt bei rund {audit_result.cwv_lcp_ms} ms")
-
-    if audit_result and audit_result.seo_h1_count == 0:
-        hints.append("- Auf der Seite fehlt eine klare H1-Überschrift")
+        trigger_hints.append(
+            f"- Audit-Trigger Ladezeit: LCP liegt bei rund {audit_result.cwv_lcp_ms} ms"
+        )
 
     if audit_result and audit_result.seo_meta_description in (None, ""):
-        hints.append("- Meta-Description fehlt oder ist unvollständig")
+        trigger_hints.append(
+            "- Audit-Trigger Meta Description: fehlt oder ist unvollständig"
+        )
 
     high_issues = [
         issue for issue in audit_issues if issue.severity in {"high", "critical"}
     ]
-    for issue in high_issues[:3]:
-        hints.append(f"- {issue.title}")
+    conversion_keywords = ("cta", "call to action", "conversion")
+    local_seo_keywords = (
+        "local",
+        "local seo",
+        "bewertung",
+        "review",
+        "google business",
+    )
 
+    for issue in high_issues:
+        normalized_title = (issue.title or "").lower()
+        if any(keyword in normalized_title for keyword in conversion_keywords):
+            trigger_hints.append(f"- Audit-Trigger CTA/Conversion: {issue.title}")
+            break
+
+    for issue in high_issues:
+        normalized_title = (issue.title or "").lower()
+        if any(keyword in normalized_title for keyword in local_seo_keywords):
+            trigger_hints.append(
+                f"- Audit-Trigger Local-SEO-Bewertungen: {issue.title}"
+            )
+            break
+
+    if high_issues and high_issues[0].title:
+        trigger_hints.append(f"- Audit-Trigger SEO-Issue: {high_issues[0].title}")
+
+    if len(trigger_hints) < 4:
+        existing_trigger_text = " ".join(trigger_hints).lower()
+        if "cta/conversion" not in existing_trigger_text:
+            trigger_hints.append(
+                "- Audit-Trigger CTA/Conversion: zentrale Handlungsaufforderung "
+                "und Kontaktpfad sind nicht klar genug"
+            )
+        if "local-seo-bewertungen" not in existing_trigger_text:
+            trigger_hints.append(
+                "- Audit-Trigger Local-SEO-Bewertungen: Bewertungspräsenz und "
+                "lokale Vertrauenssignale sind ausbaufähig"
+            )
+
+    hints = (trigger_hints[:4] + context_hints[:2])[:6]
     if not hints:
         return _fallback_personalization(lead)
 
@@ -268,9 +316,10 @@ def _build_personalization(
 def _fallback_personalization(lead: Lead) -> str:
     company = lead.company_name or "Ihr Unternehmen"
     return (
-        f"- Wir sehen bei {company} Potenzial bei Ladezeit, Sichtbarkeit "
-        "und Conversion-Pfaden\n"
-        "- Wir können kurzfristig Quick Wins priorisieren und umsetzbar dokumentieren"
+        "- Im Erstcheck sehen wir Potenzial bei Ladezeit, Meta Description, "
+        "CTA/Conversion und Local-SEO-Bewertungen.\n"
+        f"- Für {company} kann ich gern eine kurze, priorisierte "
+        "Ersteinschätzung mit konkreten Quick Wins senden."
     )
 
 
