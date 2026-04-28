@@ -58,3 +58,11 @@ Ausnahme: ausschließlich Dokumentations-/Kommentaränderungen.
 - Keine echten Secrets schreiben/lesen, außer für explizite Leak-Prüfungen.
 - Scraping-/Lead-Workflows müssen DSGVO, robots.txt, Rate-Limits und Fair-Use beachten.
 
+
+## Erweiterte Durchsetzungsregeln (verbindlich)
+
+- Skills dürfen ausschließlich passend zur Aufgabe geladen werden; unnötiges/globales Skill-Laden ist unzulässig.
+- Bei großen Änderungen (siehe objektive Trigger in `.agent/PLANS.md`) besteht ExecPlan-Pflicht vor Merge.
+- Für Security/API/Crawling/DB/CI-relevante Änderungen ist das Multi-Agent-Gate (`docs/MULTI_AGENT_GATE.md`) verpflichtend.
+- Reviewer- und Security-Rollen sind bevorzugt `read-only` einzusetzen; schreibende Eingriffe nur mit Begründung.
+- Evidence ist Pflicht, nicht optional: Ohne belastbare Nachweise zu Checks, Risiken und Mitigations ist kein Merge zulässig.
