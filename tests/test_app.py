@@ -158,6 +158,32 @@ def test_lead_detail_shows_rating_and_reviews(client, app):
     assert "91" in text
 
 
+def test_create_contact_form_draft_route_creates_draft(client, app):
+    with app.app_context():
+        lead = Lead(
+            company_name="Draft GmbH",
+            source_query="x",
+            website="https://draft.example",
+            checked_pages="https://draft.example/kontakt",
+        )
+        db.session.add(lead)
+        db.session.commit()
+        lead_id = lead.id
+
+    response = client.post(f"/leads/{lead_id}/drafts/contact-form")
+    assert response.status_code == 302
+
+    with app.app_context():
+        refreshed = db.session.get(Lead, lead_id)
+        assert refreshed is not None
+        assert "https://draft.example/kontakt" in (refreshed.contact_form_urls or [])
+        drafts = OutreachDraft.query.filter_by(
+            lead_id=lead_id, channel="contact_form"
+        ).all()
+        assert len(drafts) == 1
+        assert drafts[0].meta_json["auto_send"] is False
+
+
 def test_api_endpoints(client, app):
     with app.app_context():
         lead = Lead(company_name="API GmbH", source_query="query")

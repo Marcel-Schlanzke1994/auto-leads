@@ -11,17 +11,17 @@ from dotenv import load_dotenv
 # korrekt übernommen werden.
 load_dotenv()
 
-from flask import Flask
+from flask import Flask  # noqa: E402
 
-from app.extensions import csrf, db, limiter, migrate
-from app.routes.dashboard import dashboard_bp
-from app.routes.export import export_bp
-from app.routes.jobs import jobs_bp
-from app.routes.outreach import outreach_bp
-from app.routes.leads import leads_bp
-from app.routes.api import api_bp
-from app.routes.web_compat import web_compat_bp
-from config import Config
+from app.extensions import csrf, db, limiter, migrate  # noqa: E402
+from app.routes.dashboard import dashboard_bp  # noqa: E402
+from app.routes.export import export_bp  # noqa: E402
+from app.routes.jobs import jobs_bp  # noqa: E402
+from app.routes.outreach import outreach_bp  # noqa: E402
+from app.routes.leads import leads_bp  # noqa: E402
+from app.routes.api import api_bp  # noqa: E402
+from app.routes.web_compat import web_compat_bp  # noqa: E402
+from config import Config  # noqa: E402
 
 
 def create_app(test_config: dict | None = None) -> Flask:
