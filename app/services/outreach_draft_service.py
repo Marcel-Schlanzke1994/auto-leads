@@ -72,6 +72,21 @@ def check_outreach_block(lead: Lead, channel: str) -> BlockCheckResult:
                 matched_value=normalized_domain,
             )
 
+    if normalized_company:
+        opt_out_by_company = (
+            OptOut.query.filter(OptOut.company_name_normalized == normalized_company)
+            .filter(OptOut.channel.in_([channel, "all"]))
+            .first()
+        )
+        if opt_out_by_company:
+            return BlockCheckResult(
+                blocked=True,
+                status="blocked",
+                reason="Opt-out für Unternehmen vorhanden",
+                matched_field="company",
+                matched_value=normalized_company,
+            )
+
     blacklist_query = Blacklist.query.filter(Blacklist.active.is_(True)).filter(
         (Blacklist.expires_at.is_(None)) | (Blacklist.expires_at > datetime.now(UTC))
     )

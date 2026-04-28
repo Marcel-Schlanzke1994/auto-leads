@@ -38,6 +38,7 @@ from app.services.outreach_draft_service import (
     SUPPORTED_CHANNELS,
     generate_outreach_draft,
 )
+from app.services.duplicate_service import normalize_company_name
 from app.services.website_audit_service import audit_website, persist_audit_result
 from app.extensions import db
 from app.forms import OUTREACH_STATUS_LABELS, StatusForm
@@ -238,6 +239,8 @@ def lead_detail(lead_id: int) -> str:
     email_normalized = _normalize_email(lead.email)
     phone_normalized = _normalize_phone(lead.phone)
     domain = _extract_domain(lead.website)
+    company_name = (lead.company_name or "").strip()
+    company_name_normalized = normalize_company_name(company_name)
 
     opt_out_match = (
         db.session.query(OptOut)
@@ -252,6 +255,10 @@ def lead_detail(lead_id: int) -> str:
                     OptOut.phone_normalized == phone_normalized,
                 ),
                 db.and_(OptOut.domain.isnot(None), OptOut.domain == domain),
+                db.and_(
+                    OptOut.company_name_normalized.isnot(None),
+                    OptOut.company_name_normalized == company_name_normalized,
+                ),
             )
         )
         .order_by(OptOut.created_at.desc())
@@ -274,6 +281,10 @@ def lead_detail(lead_id: int) -> str:
                 db.and_(
                     Blacklist.entry_type == "domain",
                     Blacklist.value_normalized == domain,
+                ),
+                db.and_(
+                    Blacklist.entry_type == "company",
+                    Blacklist.value_normalized == company_name_normalized,
                 ),
             )
         )
@@ -656,52 +667,71 @@ def set_contact_block(lead_id: int):
     email_normalized = _normalize_email(lead.email)
     phone_normalized = _normalize_phone(lead.phone)
     domain = _extract_domain(lead.website)
+    company_name = (lead.company_name or "").strip()
+    company_name_normalized = normalize_company_name(company_name)
     try:
-        with db.session.begin():
-            if block_type == "blacklist":
-                entry_type = (request.form.get("entry_type") or "email").strip()
-                value_map = {
-                    "email": email_normalized,
-                    "phone": phone_normalized,
-                    "domain": domain,
-                }
-                value_normalized = value_map.get(entry_type, "")
-                if not value_normalized:
-                    flash("Kein gültiger Wert für Blacklist gefunden", "error")
-                    return redirect(url_for("leads.lead_detail", lead_id=lead.id))
-                existing = (
-                    db.session.query(Blacklist)
-                    .filter_by(entry_type=entry_type, value=value_normalized)
-                    .first()
-                )
-                if existing:
-                    existing.active = True
-                    existing.reason = reason or existing.reason
-                else:
-                    db.session.add(
-                        Blacklist(
-                            entry_type=entry_type,
-                            value=value_normalized,
-                            value_normalized=value_normalized,
-                            reason=reason,
-                        )
-                    )
+        if block_type == "blacklist":
+            entry_type = (request.form.get("entry_type") or "").strip()
+            if _truthy(request.form.get("blacklist_company")):
+                entry_type = "company"
+            entry_type = entry_type or "email"
+            value_map = {
+                "email": email_normalized,
+                "phone": phone_normalized,
+                "domain": domain,
+                "company": company_name_normalized,
+            }
+            value_normalized = value_map.get(entry_type, "")
+            if not value_normalized:
+                flash("Kein gültiger Wert für Blacklist gefunden", "error")
+                return redirect(url_for("leads.lead_detail", lead_id=lead.id))
+            existing = (
+                db.session.query(Blacklist)
+                .filter_by(entry_type=entry_type, value=value_normalized)
+                .first()
+            )
+            if existing:
+                existing.active = True
+                existing.reason = reason or existing.reason
             else:
-                if not any([email_normalized, phone_normalized, domain]):
-                    flash("Keine Kontaktinformationen für Opt-Out vorhanden", "error")
-                    return redirect(url_for("leads.lead_detail", lead_id=lead.id))
                 db.session.add(
-                    OptOut(
-                        channel=channel,
-                        email=lead.email,
-                        email_normalized=email_normalized or None,
-                        phone=lead.phone,
-                        phone_normalized=phone_normalized or None,
-                        domain=domain or None,
+                    Blacklist(
+                        entry_type=entry_type,
+                        value=value_normalized,
+                        value_normalized=value_normalized,
+                        company_name=company_name or None,
                         reason=reason,
-                        requested_at=datetime.now(UTC),
                     )
                 )
+        else:
+            block_company = _truthy(request.form.get("opt_out_company"))
+            if not any(
+                [
+                    email_normalized,
+                    phone_normalized,
+                    domain,
+                    company_name_normalized if block_company else None,
+                ]
+            ):
+                flash("Keine Kontaktinformationen für Opt-Out vorhanden", "error")
+                return redirect(url_for("leads.lead_detail", lead_id=lead.id))
+            db.session.add(
+                OptOut(
+                    channel=channel,
+                    email=lead.email,
+                    email_normalized=email_normalized or None,
+                    phone=lead.phone,
+                    phone_normalized=phone_normalized or None,
+                    domain=domain or None,
+                    company_name=company_name if block_company else None,
+                    company_name_normalized=(
+                        company_name_normalized if block_company else None
+                    ),
+                    reason=reason,
+                    requested_at=datetime.now(UTC),
+                )
+            )
+        db.session.commit()
         flash("Kontakt wurde gesperrt", "success")
     except Exception as exc:  # noqa: BLE001
         db.session.rollback()
