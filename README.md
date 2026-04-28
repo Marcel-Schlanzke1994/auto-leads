@@ -162,3 +162,17 @@ Für einen einheitlichen Ablauf zwischen Entwicklern und Agenten gelten folgende
 - Operativer Master-Plan: `docs/execplans/auto-lead-system-execplan.md`.
 
 Änderungen sollten immer entlang des ExecPlans geplant und in den oben genannten Dateien konsistent dokumentiert werden.
+
+## Optional Cloudflare Worker Foundation
+
+Die Cloudflare-Schicht ist aktuell eine **optionale Vorbereitung** und hat keinen Einfluss auf das lokale Flask-System.
+
+Details: `docs/CLOUDFLARE_FOUNDATION.md`
+
+```bash
+cd cloudflare
+npm install
+npm run dev
+npm run typecheck
+```
+
