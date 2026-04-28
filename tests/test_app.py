@@ -210,6 +210,41 @@ def test_api_search_start_with_target_count(client, app, monkeypatch):
     assert payload["status"] == "queued"
 
 
+def test_api_search_start_with_invalid_target_count_returns_400(client):
+    response = client.post(
+        "/api/search/start",
+        json={"keyword": "Elektriker", "cities": "Köln", "target_count": "abc"},
+    )
+
+    assert response.status_code == 400
+    assert response.get_json() == {"error": "target_count must be an integer"}
+
+
+def test_api_search_start_with_negative_target_count_clamps_to_minimum(
+    client, app, monkeypatch
+):
+    def fake_start_search_job(
+        flask_app, keyword, cities, target_count=1000, radius=None
+    ):
+        assert flask_app is app
+        assert keyword == "Elektriker"
+        assert cities == ["Köln"]
+        assert target_count == 1
+        return SimpleNamespace(id=124, status="queued")
+
+    monkeypatch.setattr("app.routes.api.start_search_job", fake_start_search_job)
+    response = client.post(
+        "/api/search/start",
+        json={"keyword": "Elektriker", "cities": "Köln", "target_count": -5},
+    )
+
+    assert response.status_code == 202
+    payload = response.get_json()
+    assert payload["job_id"] == 124
+    assert payload["status"] == "queued"
+    assert payload["target_count"] == 1
+
+
 def test_csv_export_contains_new_fields(client, app):
     with app.app_context():
         db.session.add(
