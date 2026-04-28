@@ -54,7 +54,7 @@ def test_duplicate_checks_all_match_paths(app):
             phone=None,
             email=None,
         )
-        assert is_duplicate(
+        assert not is_duplicate(
             place_id=None,
             company_name="Muster AG",
             city="Berlin",
@@ -77,6 +77,35 @@ def test_duplicate_checks_all_match_paths(app):
             website=None,
             phone=None,
             email=" info@firma.de ",
+        )
+
+
+def test_same_company_name_in_different_city_is_not_hard_duplicate(app):
+    with app.app_context():
+        db.session.add(
+            _lead(
+                company_name="Nord Solar GmbH",
+                normalized_company_name=normalize_company_name("Nord Solar GmbH"),
+                city="Hamburg",
+                city_normalized=normalize_city("Hamburg"),
+                website="https://nord-solar.de",
+                domain="nord-solar.de",
+                google_place_id="gp-hh",
+                email="kontakt@nord-solar.de",
+                email_normalized="kontakt@nord-solar.de",
+                phone="+494012345",
+                phone_normalized="+494012345",
+            )
+        )
+        db.session.commit()
+
+        assert not is_duplicate(
+            place_id=None,
+            company_name="Nord Solar AG",
+            city="München",
+            website=None,
+            phone=None,
+            email=None,
         )
 
 
