@@ -100,6 +100,20 @@ def _map_legacy_outreach_status(value: str, enabled: bool = True) -> str:
     return LEGACY_OUTREACH_STATUS_MAP.get(value, value)
 
 
+def _load_latest_audit_context(
+    lead_id: int,
+) -> tuple[AuditResult | None, list[AuditIssue]]:
+    latest_audit = (
+        AuditResult.query.filter_by(lead_id=lead_id)
+        .order_by(AuditResult.created_at.desc())
+        .first()
+    )
+    if not latest_audit:
+        return None, []
+    audit_issues = AuditIssue.query.filter_by(audit_result_id=latest_audit.id).all()
+    return latest_audit, audit_issues
+
+
 def build_lead_query_from_args(args):
     query = Lead.query.outerjoin(AuditResult, AuditResult.lead_id == Lead.id)
 
@@ -415,7 +429,13 @@ def create_draft(lead_id: int):
         flash("Ungültiger Draft-Status", "error")
         return redirect(url_for("leads.lead_detail", lead_id=lead.id))
 
-    generated = generate_outreach_draft(lead=lead, channel=channel)
+    latest_audit, audit_issues = _load_latest_audit_context(lead.id)
+    generated = generate_outreach_draft(
+        lead=lead,
+        channel=channel,
+        audit_result=latest_audit,
+        audit_issues=audit_issues,
+    )
     if generated.blocked:
         reason = generated.error_message or "Lead ist für Outreach blockiert"
         flash(
@@ -452,10 +472,10 @@ def create_draft(lead_id: int):
         status=draft_status,
     )
     try:
-        with db.session.begin():
-            db.session.add(draft)
-            if existing_drafts_count == 0:
-                lead.status = "draft_created"
+        db.session.add(draft)
+        if existing_drafts_count == 0:
+            lead.status = "draft_created"
+        db.session.commit()
         flash("Draft erstellt", "success")
     except Exception as exc:  # noqa: BLE001
         db.session.rollback()
@@ -471,17 +491,18 @@ def create_contact_form_draft(lead_id: int):
         flash("Lead nicht gefunden", "error")
         return redirect(url_for("leads.leads_list"))
 
-    latest_audit = (
-        AuditResult.query.filter_by(lead_id=lead.id)
-        .order_by(AuditResult.created_at.desc())
-        .first()
-    )
+    latest_audit, audit_issues = _load_latest_audit_context(lead.id)
     detected_urls = detect_contact_form_urls(lead, latest_audit=latest_audit)
     lead.contact_form_urls = merge_contact_form_urls(
         lead.contact_form_urls, detected_urls
     )
 
-    block_or_generation = generate_outreach_draft(lead=lead, channel="contact_form")
+    block_or_generation = generate_outreach_draft(
+        lead=lead,
+        channel="contact_form",
+        audit_result=latest_audit,
+        audit_issues=audit_issues,
+    )
     if block_or_generation.blocked:
         reason = block_or_generation.error_message or "Lead ist für Outreach blockiert"
         flash(

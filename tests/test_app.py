@@ -2,7 +2,16 @@ from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
 from app.extensions import db
-from app.models import Blacklist, ContactAttempt, Lead, OptOut, OutreachDraft, SearchJob
+from app.models import (
+    AuditIssue,
+    AuditResult,
+    Blacklist,
+    ContactAttempt,
+    Lead,
+    OptOut,
+    OutreachDraft,
+    SearchJob,
+)
 from app.services.duplicate_service import is_duplicate
 from app.services.lead_score_service import calculate_lead_score
 from app.services.search_runner_service import (
@@ -182,6 +191,51 @@ def test_create_contact_form_draft_route_creates_draft(client, app):
         ).all()
         assert len(drafts) == 1
         assert drafts[0].meta_json["auto_send"] is False
+
+
+def test_create_draft_route_includes_latest_audit_hints(client, app):
+    with app.app_context():
+        lead = Lead(
+            company_name="Audit Draft GmbH",
+            source_query="x",
+            website="https://audit-draft.example",
+        )
+        db.session.add(lead)
+        db.session.flush()
+        audit = AuditResult(
+            lead_id=lead.id,
+            created_at=datetime.now(UTC),
+            score_performance=0.42,
+            cwv_lcp_ms=3150,
+        )
+        db.session.add(audit)
+        db.session.flush()
+        db.session.add(
+            AuditIssue(
+                audit_result_id=audit.id,
+                severity="high",
+                category="seo",
+                title="CTA conversion path not visible",
+            )
+        )
+        db.session.commit()
+        lead_id = lead.id
+
+    response = client.post(f"/leads/{lead_id}/drafts", data={"channel": "email"})
+    assert response.status_code == 302
+
+    with app.app_context():
+        draft = (
+            OutreachDraft.query.filter_by(lead_id=lead_id, channel="email")
+            .order_by(OutreachDraft.id.desc())
+            .first()
+        )
+        assert draft is not None
+        assert "Audit-Trigger Ladezeit: LCP liegt bei rund 3150 ms" in draft.body
+        assert (
+            "Audit-Trigger CTA/Conversion: CTA conversion path not visible"
+            in draft.body
+        )
 
 
 def test_api_endpoints(client, app):
