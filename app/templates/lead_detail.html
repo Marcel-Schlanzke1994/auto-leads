@@ -35,6 +35,10 @@
 
 <section class="panel">
   <h3>Draft erstellen</h3>
+  <form method="post" action="{{ url_for('leads.create_contact_form_draft', lead_id=lead.id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+    <button class="btn" type="submit">Kontaktformular-Draft aus erkannten URLs erstellen</button>
+  </form>
   <form method="post" action="{{ url_for('leads.create_draft', lead_id=lead.id) }}">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
     <label>Kanal <input type="text" name="channel" value="email" maxlength="30"></label>
@@ -121,6 +125,17 @@
     <label>Grund <input type="text" name="reason" maxlength="255"></label>
     <button class="btn" type="submit">Kontakt sperren</button>
   </form>
+</section>
+
+<section class="panel">
+  <h3>Erkannte Kontaktseiten / Formular-URLs</h3>
+  <ul>
+    {% for url in lead.contact_form_urls or [] %}
+    <li><a href="{{ url }}" target="_blank" rel="noopener noreferrer">{{ url }}</a></li>
+    {% else %}
+    <li>Keine Kontakt-URL erkannt.</li>
+    {% endfor %}
+  </ul>
 </section>
 
 <section class="panel">

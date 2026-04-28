@@ -25,6 +25,11 @@ from app.models import (
     OptOut,
     OutreachDraft,
 )
+from app.services.contact_form_service import (
+    build_contact_form_draft,
+    detect_contact_form_urls,
+    merge_contact_form_urls,
+)
 from app.services.lead_score_service import (
     calculate_lead_score,
     calculate_lead_score_details,
@@ -314,6 +319,10 @@ def rerun_audit(lead_id: int):
         lead.parser_notes = audit.parser_notes
         lead.checked_pages = audit.checked_pages
         lead.audit_notes = audit.audit_notes
+        detected_urls = detect_contact_form_urls(lead)
+        lead.contact_form_urls = merge_contact_form_urls(
+            lead.contact_form_urls, detected_urls
+        )
         if audit.email:
             lead.email = audit.email
         if audit.phone:
@@ -363,6 +372,44 @@ def create_draft(lead_id: int):
         with db.session.begin():
             db.session.add(draft)
         flash("Draft erstellt", "success")
+    except Exception as exc:  # noqa: BLE001
+        db.session.rollback()
+        flash(f"Draft konnte nicht erstellt werden: {exc}", "error")
+    return redirect(url_for("leads.lead_detail", lead_id=lead.id))
+
+
+@leads_bp.post("/<int:lead_id>/drafts/contact-form")
+def create_contact_form_draft(lead_id: int):
+    lead = db.session.get(Lead, lead_id)
+    if not lead:
+        flash("Lead nicht gefunden", "error")
+        return redirect(url_for("leads.leads_list"))
+
+    latest_audit = (
+        AuditResult.query.filter_by(lead_id=lead.id)
+        .order_by(AuditResult.created_at.desc())
+        .first()
+    )
+    detected_urls = detect_contact_form_urls(lead, latest_audit=latest_audit)
+    lead.contact_form_urls = merge_contact_form_urls(
+        lead.contact_form_urls, detected_urls
+    )
+
+    draft_payload = build_contact_form_draft(
+        lead=lead, target_urls=lead.contact_form_urls or detected_urls
+    )
+    draft = OutreachDraft(
+        lead_id=lead.id,
+        channel="contact_form",
+        subject=draft_payload.subject,
+        body=draft_payload.body,
+        template_key="contact_form_detected_urls",
+        meta_json={"target_urls": draft_payload.target_urls, "auto_send": False},
+    )
+    try:
+        db.session.add(draft)
+        db.session.commit()
+        flash("Kontaktformular-Draft erstellt (kein Versand).", "success")
     except Exception as exc:  # noqa: BLE001
         db.session.rollback()
         flash(f"Draft konnte nicht erstellt werden: {exc}", "error")
