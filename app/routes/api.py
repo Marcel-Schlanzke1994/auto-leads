@@ -29,7 +29,14 @@ def api_search_start():
     payload = request.get_json(silent=True) or {}
     keyword = str(payload.get("keyword") or "").strip()
     cities_raw = str(payload.get("cities") or "").strip()
-    target_count = int(payload.get("target_count") or 1000)
+    target_count_raw = payload.get("target_count")
+    target_count_fallback = 1000
+    try:
+        target_count = int(
+            target_count_fallback if target_count_raw is None else target_count_raw
+        )
+    except (ValueError, TypeError):
+        return jsonify({"error": "target_count must be an integer"}), 400
 
     if not keyword or not cities_raw:
         return jsonify({"error": "keyword and cities are required"}), 400
