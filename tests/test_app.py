@@ -305,6 +305,20 @@ def test_search_job_reaches_target_and_paginates(app, monkeypatch):
             phone=None,
             owner_name="Owner",
             legal_form="GmbH",
+            critical_issues=[],
+            warnings=[],
+            opportunities=[],
+            quick_wins=[],
+            top_sales_arguments=["arg"],
+            raw_pagespeed={
+                "performance_score": 80,
+                "accessibility_score": 80,
+                "best_practices_score": 80,
+                "seo_score": 80,
+                "lcp_ms": 1000,
+                "fcp_ms": 400,
+                "ttfb_ms": 100,
+            },
         ),
     )
 
@@ -316,3 +330,54 @@ def test_search_job_reaches_target_and_paginates(app, monkeypatch):
         assert updated.total_created == 3
         assert updated.total_found_raw == 4
         assert Lead.query.count() == 3
+
+
+def test_job_detail_and_progress_endpoints(client, app):
+    with app.app_context():
+        job = SearchJob(
+            keyword="Maler",
+            cities="Berlin",
+            status="running",
+            target_count=1500,
+            total_found_raw=50,
+            total_created=12,
+            duplicates_skipped=3,
+            errors=1,
+            log_json=[{"phase": "start", "timestamp": "2026-01-01T00:00:00Z"}],
+        )
+        db.session.add(job)
+        db.session.commit()
+        job_id = job.id
+
+    detail_resp = client.get(f"/jobs/{job_id}/json")
+    assert detail_resp.status_code == 200
+    detail_payload = detail_resp.get_json()
+    assert detail_payload["events_count"] == 1
+
+    poll_resp = client.get(f"/jobs/{job_id}/progress?since=0")
+    assert poll_resp.status_code == 200
+    poll_payload = poll_resp.get_json()
+    assert poll_payload["events_total"] == 1
+    assert poll_payload["target_count"] == 1000
+
+
+def test_api_progress_supports_since(client, app):
+    with app.app_context():
+        job = SearchJob(
+            keyword="Fensterbauer",
+            cities="Hamburg",
+            status="running",
+            log_json=[
+                {"phase": "start", "timestamp": "2026-01-01T00:00:00Z"},
+                {"phase": "city_start", "timestamp": "2026-01-01T00:01:00Z"},
+            ],
+        )
+        db.session.add(job)
+        db.session.commit()
+        job_id = job.id
+
+    resp = client.get(f"/api/search/progress?job_id={job_id}&since=1")
+    assert resp.status_code == 200
+    payload = resp.get_json()
+    assert payload["events_total"] == 2
+    assert len(payload["events"]) == 1

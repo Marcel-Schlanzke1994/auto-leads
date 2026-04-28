@@ -3,15 +3,47 @@
 {% block content %}
 <section class="panel">
   <h2>Suchjobs</h2>
-  <ul>
-  {% for job in jobs %}
-    <li>
-      <a href="{{ url_for('jobs.job_detail', job_id=job.id) }}">#{{ job.id }} {{ job.keyword }} ({{ job.cities }})</a>
-      - {{ job.status }} - {{ job.total_created }}/{{ job.target_count }}
-    </li>
-  {% else %}
-    <li>Keine Jobs vorhanden.</li>
-  {% endfor %}
-  </ul>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Status</th>
+          <th>Keyword / Städte</th>
+          <th>Aktuelle Stadt</th>
+          <th>Fortschritt</th>
+          <th>Rohdaten</th>
+          <th>Neue Leads</th>
+          <th>Dubletten</th>
+          <th>Fehler</th>
+          <th>Zeitstempel</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for job in jobs %}
+        <tr>
+          <td><a href="{{ url_for('jobs.job_detail', job_id=job.id) }}">#{{ job.id }}</a></td>
+          <td><span class="pill {{ job.status }}">{{ job.status }}</span></td>
+          <td><strong>{{ job.keyword }}</strong><br><small>{{ job.cities }}</small></td>
+          <td>{{ job.current_city or '—' }}</td>
+          <td>{{ job.total_created }}/{{ job.target_count }}</td>
+          <td>{{ job.total_found_raw }}</td>
+          <td>{{ job.total_created }}</td>
+          <td>{{ job.duplicates_skipped }}</td>
+          <td>{{ job.errors }}</td>
+          <td>
+            <small>
+              Erstellt: {{ job.created_at }}<br>
+              Aktualisiert: {{ job.updated_at }}<br>
+              Ende: {{ job.finished_at or '—' }}
+            </small>
+          </td>
+        </tr>
+      {% else %}
+        <tr><td colspan="10">Keine Jobs vorhanden.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
 </section>
 {% endblock %}
