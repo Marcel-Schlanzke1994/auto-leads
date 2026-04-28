@@ -1,119 +1,84 @@
 # Systemanalyse und Simulationsprüfung
 
-**Stand der Analyse:** 20. April 2026  
+**Stand der Analyse:** 28. April 2026  
+**Last verified against commit:** `e7dc57e`  
 **System:** Auto-Leads (lokales Flask-Tool zur Lead-Generierung über Google Places)
 
 ## 1) Hauptfunktionen des Systems
 
-Das System ist ein lokales Web-Tool zur Lead-Generierung, -Anreicherung und -Verwaltung. Kernfunktional startet der Nutzer einen Suchjob mit Suchbegriff und Städten; das System fragt dann über die offizielle Google Places API Place-IDs und Place-Details ab, normalisiert Website-URLs, filtert Dubletten und legt neue Leads in SQLite ab. Zusätzlich wird – sofern eine Website vorhanden ist – ein Website-Audit ausgeführt (Titel/Meta/H1/CTA/Mobile-Signale, Impressums-/Kontaktseiten, E-Mail/Telefon/Legal-Form/Owner-Heuristik), danach erfolgt ein regelbasierter Score mit Begründungen. Die Oberfläche bietet Dashboard, Detailansicht, Status-Workflow, Re-Audit und CSV-Export; API-Endpunkte liefern Leads und Job-Fortschritt. Damit ist der reale Zweck klar: halbautomatische lokale B2B-Lead-Discovery mit technischer Vorqualifizierung.
+Das System ist ein lokales Web-Tool zur Lead-Generierung, -Anreicherung und -Verwaltung. Kernfunktional startet der Nutzer einen Suchjob mit Suchbegriff und Städten; das System fragt dann über die offizielle Google Places API Place-IDs und Place-Details ab, normalisiert Website-URLs, filtert Dubletten und legt neue Leads in SQLite ab. Zusätzlich wird – sofern eine Website vorhanden ist – ein Website-Audit ausgeführt (Titel/Meta/H1/CTA/Mobile-Signale, Impressums-/Kontaktseiten, E-Mail/Telefon/Legal-Form/Owner-Heuristik), danach erfolgt ein regelbasierter Score mit Begründungen. Die Oberfläche bietet Dashboard, Detailansicht, Status-Workflow, Re-Audit und CSV-Export; API-Endpunkte liefern Leads und Job-Fortschritt.
 
-## 2) Startverhalten (simuliert anhand Initialisierungslogik)
+## 2) Startverhalten (konsistent zur aktuellen Runtime)
 
-Beim Start (`python app.py`) wird direkt `create_app()` aufgerufen. Dabei werden zunächst Umgebungsvariablen aus `.env` geladen, anschließend Flask inkl. Template-/Static-Pfade initialisiert und zentrale Konfiguration gesetzt (`SECRET_KEY`, `SQLALCHEMY_DATABASE_URI`, `REQUEST_TIMEOUT`, `GOOGLE_MAPS_API_KEY`, Upload-Limit). Danach werden Datenbank, CSRF-Schutz und Rate-Limiter registriert sowie Web- und API-Blueprints eingebunden. Im App-Context wird `db.create_all()` ausgeführt, d. h. Tabellen werden beim Start automatisch angelegt. Erst danach wird Logging konfiguriert und die App gestartet (Standard: `127.0.0.1:5000`, `debug=False`). Das Startverhalten ist damit robust für lokale Nutzung, birgt aber typische Risiken bei Default-Werten (z. B. unsicherer Fallback-`SECRET_KEY` in Produktionskontexten).
+**Einstiegspunkt ist `run.py`**: Beim Start (`python run.py`) wird `create_app()` aus `app` importiert und die Flask-App erzeugt. Anschließend startet `app.run(...)` mit `APP_HOST` und `APP_PORT` aus der Konfiguration sowie `debug=False`.
 
-## 3) Abhängigkeiten von externen Diensten/APIs
+In `app.create_app()` erfolgt danach die eigentliche Initialisierung:
 
-Ja, es bestehen klare externe Abhängigkeiten:
+- `.env` wird geladen (`load_dotenv()`).
+- Konfiguration kommt aus `config.py` (`app.config.from_object(Config)`), optional ergänzt durch `test_config`.
+- Für Tests gilt ein spezieller Fallback-`SECRET_KEY` (`test-secret-key`) nur bei `TESTING=True`.
+- `_validate_security_config(app)` wird **vor** der restlichen App-Initialisierung ausgeführt.
+- Extensions werden registriert (`db`, `csrf`, `limiter`, `migrate`).
+- Blueprints werden eingebunden: `dashboard`, `leads`, `jobs`, `export`, `api`, `web_compat`.
+- Für den API-Blueprint wird CSRF optional ausgenommen (`API_REQUIRE_CSRF=False` als Default).
+- Logging wird konfiguriert.
 
-- **Google Places API (New)**: zwingend erforderlich für Suche/Detailabfrage; ohne `GOOGLE_MAPS_API_KEY` schlägt ein Suchjob gezielt fehl.
-- **Beliebige Ziel-Webseiten der gefundenen Firmen**: für das Audit werden HTTP-Requests inkl. Redirect-Following ausgeführt.
-- **DNS-Auflösung**: der SSRF-Schutz löst Hostnamen auf, um private/loopback/link-local Ziele zu blockieren.
+Wichtig zur Abgrenzung: Es gibt aktuell **kein** automatisches `db.create_all()` beim normalen Start in `create_app()`.
 
-Nicht extern, aber infrastrukturell relevant: SQLite als lokale Persistenz. Das System hat **keine** OpenAI-/LLM-Abhängigkeit und keine Cloud-Pflicht außerhalb der Google-Places-Nutzung.
+## 3) Externe Abhängigkeiten
 
-## 4) Mögliche Konfigurationsfehler
+- **Google Places API (New)**: zwingend für Such- und Detailabfragen.
+- **Ziel-Webseiten der Leads**: für Website-Audit und Extraktion.
+- **DNS-Auflösung**: Bestandteil des SSRF-Schutzes.
 
-Typische Fehlkonfigurationen, die in Betrieb oder Sicherheit auffallen können:
+Nicht extern, aber runtime-relevant: SQLite (Default) mit SQLAlchemy/Alembic.
 
-- Fehlender/ungültiger `GOOGLE_MAPS_API_KEY` → Suchjobs gehen auf `failed`.
-- Nicht gesetzter `SECRET_KEY` → Fallback auf `dev-secret-change-me`; funktional lauffähig, aber sicherheitlich problematisch.
-- Unpassender `DATABASE_URL` (Pfad/Rechte) → DB-Initialisierung/Schreiboperationen fehlschlagen.
-- Zu niedriger `REQUEST_TIMEOUT` → erhöhte Fehlerquote bei langsamen Zielseiten/APIs.
-- Reverse-Proxy-/Container-Betrieb ohne korrektes Client-IP-Handling → Rate-Limits können ungenau greifen.
-- Fehlende oder falsche API-Billing-/Quota-Einstellungen bei Google → Teilfehler trotz korrektem Key.
+## 4) Konsistenz-Check der angefragten Punkte
 
-## 5) Sicherheitsaspekte
+### 4.1 `run.py` als Einstiegspunkt
 
-Positiv ist, dass bereits mehrere Schutzmaßnahmen implementiert sind: CSRF für Form-Requests, Request-Limits via Flask-Limiter und SSRF-Schutz gegen localhost/private Bereiche sowie `.local`-Hosts. Zusätzlich sind Request-Timeouts vorhanden, was bei externen HTTP-Zielen wichtig ist.
+Erfüllt. Der operative Startpfad ist `run.py` → `create_app()` → `app.run(...)`.
 
-Trotzdem sind folgende Punkte kritisch zu beachten:
+### 4.2 `app/__init__.py::_validate_security_config`
 
-- Der harte Default für `SECRET_KEY` darf produktiv nicht genutzt werden.
-- Externe Web-Audits verarbeiten untrusted HTML/Text; Parser- und Regex-Operationen sollten hinsichtlich Worst-Case-Laufzeit beobachtet werden.
-- API-Key-Schutz: Schlüssel nur über `.env`/Secret-Store, nie im Quelltext oder in Logs.
-- SQLite ist lokal praktisch, aber bei Mehrbenutzer-/Serverbetrieb funktional und sicherheitlich limitiert.
-- Für exponierte Deployments fehlen zusätzliche Härtungen wie HSTS/TLS-Termination, Security Headers auf Reverse-Proxy-Ebene, zentrales Monitoring/Alerting.
+Erfüllt. In Nicht-Dev-/Nicht-Test-Kontexten wird ein fehlender oder Platzhalter-`SECRET_KEY` explizit per `RuntimeError` blockiert. Dadurch existiert **kein unsicherer Produktions-Default**. Der Test-Fallback (`test-secret-key`) gilt nur unter `TESTING`.
 
-## 6) Lokal nutzbar oder zusätzlicher Webserver nötig?
+### 4.3 Blueprint-/Service-Struktur vs. `docs/ARCHITECTURE.md`
 
-Das System ist **direkt lokal nutzbar**: Start per `python app.py`, Zugriff über Browser auf `http://127.0.0.1:5000`. Ein zusätzlicher Webserver (Nginx/Apache/Caddy) ist für lokale Einzelplatznutzung nicht nötig. Für produktionsnahe oder öffentlich erreichbare Szenarien ist ein vorgelagerter Webserver/Reverse Proxy jedoch empfehlenswert (TLS, Logging, Header-Härtung, Prozessmanagement).
+Konsistent. Die in der Architektur dokumentierten Blueprints (`dashboard`, `leads`, `jobs`, `export`, `api`, `web_compat`) und die Service-Gruppen unter `app/services/` entsprechen der aktuellen Struktur.
 
-## 7) Bedarf an OpenAI API oder ähnlichem?
+## 5) Sicherheitsaspekte (Status)
 
-Für die vorhandene Kernlogik: **Nein**. Das System nutzt standardmäßig keine OpenAI-API, keine Embeddings und kein LLM-Backend. Erforderlich ist primär ein gültiger Google-Places-Key. Optional könnten LLMs später für Lead-Qualifizierung/Textklassifikation ergänzt werden, sind aber aktuell kein Bestandteil.
+Positiv vorhanden:
 
-## Zusammenfassung mit Empfehlungen für lokale Nutzung
+- CSRF-Schutz für Web-Formularrouten.
+- Rate-Limiting via Flask-Limiter.
+- SSRF-Schutz im Audit-Workflow.
+- Produktions-Schutz für `SECRET_KEY` via `_validate_security_config`.
 
-Das System ist ein sauber strukturierter lokaler Flask-Stack mit klarem Lead-Workflow, vernünftigen Basis-Sicherheitsmaßnahmen und nachvollziehbarer Datenverarbeitung. Die wichtigsten Betriebsrisiken liegen in externer API-Abhängigkeit (Google Quota/Billing), Umgebungsvariablenqualität und sicherer Secret-Verwaltung.
+Weiterhin relevant:
 
-Für eine stabile lokale Nutzung empfehle ich:
+- API-Write-Endpoints bleiben in Verantwortung von Token-Auth, restriktiven Limits und Input-Validierung (CSRF ist für API standardmäßig ausgenommen).
+- Secrets weiterhin ausschließlich über `.env`/Secret-Store.
 
-1. `.env` sauber pflegen: **starker** `SECRET_KEY`, korrekter `GOOGLE_MAPS_API_KEY`, sinnvoller `REQUEST_TIMEOUT`.
-2. API-Kosten kontrollieren: Google-Billing aktivieren, Quotas und Alerts setzen.
-3. SQLite-Datei und Backup-Strategie definieren (z. B. täglicher Dump).
-4. Regelmäßig Tests und Style-Checks fahren (`pytest`, `black --check .`, `flake8`).
-5. Logs überwachen (Fehlerrate, Timeouts, API-Statuscodes).
-6. Bei Internet-Exponierung Reverse-Proxy mit TLS und Security-Headers nutzen.
-7. Für Team-/Mehrnutzerbetrieb mittelfristig auf PostgreSQL + WSGI-Server (gunicorn/uwsgi) migrieren.
+## 6) Betriebsmodus lokal vs. produktionsnah
+
+- **Lokal:** direkt per `python run.py` nutzbar.
+- **Produktionsnah/öffentlich:** Reverse Proxy + TLS + Header-Härtung + Monitoring empfohlen.
 
 ---
 
-## 8) Simulierte Vollprüfung (Lauffähigkeit, Fehlerbild, Funktionsabdeckung)
+## 7) Simulierte Vollprüfung (Konsistenzfokus)
 
-**Durchgeführt am:** 20. April 2026 (UTC)  
-**Kontext:** Lokale Ausführung im Projektordner `/workspace/auto-leads`.
+**Durchgeführt am:** 28. April 2026 (UTC)  
+**Kontext:** Struktur-/Konfigurationskonsistenz anhand Code und Architektur-Doku.
 
-### 8.1 Technische Laufprüfung
+### Ergebnis
 
-Ausgeführt wurden die obligatorischen Qualitätsprüfungen:
+- Einstiegspunkt: korrekt auf `run.py`.
+- Security-Validierung: vorhanden und produktionssicher bzgl. `SECRET_KEY`-Defaults.
+- Architektur-Doku: konsistent zur aktuellen Blueprint-/Service-Organisation.
 
-- `pytest` → **8/8 Tests bestanden**.
-- `black --check .` → **Formatierung vollständig korrekt**.
-- `flake8` → **keine Lint-Fehler**.
+### Kurzfazit
 
-Ergebnis: Der aktuelle Stand ist lokal lauffähig und im getesteten Scope fehlerfrei.
-
-### 8.2 Pflicht-Checks aus Aufgaben-/Policy-Sicht
-
-Nachfolgende Punkte wurden gegen den tatsächlichen Codebestand geprüft:
-
-1. **Tokens sicher gespeichert (nicht im Quellcode):**
-   - API-Key wird über `.env`/`os.getenv` geladen, kein Hardcoding im Business-Code.
-   - **Status:** erfüllt (mit Hinweis: `SECRET_KEY` besitzt einen unsicheren Fallback für Dev).
-
-2. **Calendar-API mit gültigen Zugriffstokens getestet:**
-   - Im Projekt existiert derzeit **keine Calendar-Integration**.
-   - **Status:** nicht anwendbar / nicht implementiert.
-
-3. **Mongo-kompatible Event-Datenstruktur (`google_id`, `start`, `event_time`, …):**
-   - Projekt nutzt relationale SQLAlchemy-Modelle (SQLite), keine Event-Collection.
-   - **Status:** nicht anwendbar / nicht implementiert.
-
-4. **Discord-Cogs ohne Endlosschleifen:**
-   - Es gibt keine Discord-Cogs im Repository.
-   - **Status:** nicht anwendbar / nicht implementiert.
-
-5. **Umgebungsvariablen statt harter Pfade:**
-   - Relevante Konfiguration wird per `os.getenv`/`.env` bezogen.
-   - **Status:** erfüllt.
-
-### 8.3 Bewertung (Skala 1.0 bis 0.1)
-
-- **Funktionen (ist-Implementierung): 1.0/1.0**  
-  Kernfunktionen (Suche, Dubletten, Audit, Scoring, UI, Export) laufen im Testumfang stabil.
-
-- **Aufgabenfit zu deiner erweiterten Policy: 0.7/1.0**  
-  Grund: Calendar/Mongo/Discord-spezifische Anforderungen sind für dieses Repository aktuell nicht umgesetzt (weder positiv noch negativ testbar).
-
-- **Gesamtnote (praktisch für dieses Tool): 0.9/1.0**  
-  Sehr guter Zustand für den vorhandenen Funktionsumfang; klare Erweiterungspunkte bei Integrationen, die derzeit nicht Teil des Systems sind.
+Die Analyse ist auf dem aktuellen Stand und mit den angefragten technischen Referenzen konsistent.
