@@ -4,6 +4,13 @@ import logging
 import os
 
 from dotenv import load_dotenv
+
+# WICHTIG:
+# .env muss VOR dem Import von Config geladen werden,
+# damit GOOGLE_MAPS_API_KEY, FLASK_ENV, SECRET_KEY usw.
+# korrekt übernommen werden.
+load_dotenv()
+
 from flask import Flask
 
 from app.extensions import csrf, db, limiter, migrate
@@ -17,12 +24,12 @@ from config import Config
 
 
 def create_app(test_config: dict | None = None) -> Flask:
-    load_dotenv()
     app = Flask(__name__, instance_relative_config=True)
     app.config.from_object(Config)
 
     if test_config:
         app.config.update(test_config)
+
     if app.config.get("TESTING") and not app.config.get("SECRET_KEY"):
         app.config["SECRET_KEY"] = "test-secret-key"
 
@@ -36,9 +43,9 @@ def create_app(test_config: dict | None = None) -> Flask:
     migrate.init_app(app, db)
 
     # API-Sicherheitsstrategie:
-    # - CSRF wird für den API-Blueprint explizit ausgenommen.
-    # - Schreibende API-Endpoints müssen stattdessen Token-Auth, striktere
-    #   Rate-Limits und Input-Validierung erzwingen (siehe app/routes/api.py).
+    # - CSRF wird für den API-Blueprint explizit ausgenommen
+    # - Schreibende API-Endpoints nutzen stattdessen
+    #   Token-Auth + striktere Limits + Input-Validierung
     app.config.setdefault("API_REQUIRE_CSRF", False)
     app.config.setdefault("API_AUTH_HEADER", "X-API-Key")
     app.config.setdefault("API_AUTH_TOKEN", "")
@@ -49,6 +56,7 @@ def create_app(test_config: dict | None = None) -> Flask:
     app.register_blueprint(export_bp)
     app.register_blueprint(api_bp)
     app.register_blueprint(web_compat_bp)
+
     if not app.config.get("API_REQUIRE_CSRF", False):
         csrf.exempt(api_bp)
 
@@ -69,9 +77,14 @@ def _configure_logging(app: Flask) -> None:
 def _validate_security_config(app: Flask) -> None:
     secret_key = str(app.config.get("SECRET_KEY") or "").strip()
     insecure_placeholder = "replace-with-a-long-random-secret"
+
     is_dev = bool(app.config.get("TESTING")) or Config.is_development_mode()
-    if not is_dev and (not secret_key or secret_key == insecure_placeholder):
+
+    if not is_dev and (
+        not secret_key
+        or secret_key == insecure_placeholder
+    ):
         raise RuntimeError(
-            "SECRET_KEY muss in Produktion gesetzt sein und darf kein "
-            "Default-/Placeholder-Wert sein."
+            "SECRET_KEY muss in Produktion gesetzt sein "
+            "und darf kein Default-/Placeholder-Wert sein."
         )
