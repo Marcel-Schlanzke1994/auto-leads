@@ -31,9 +31,9 @@ from app.services.website_audit_service import audit_website, persist_audit_resu
 from auto_leads.extensions import db
 from auto_leads.utils import normalize_website_url
 
-SAFETY_MAX_RAW_RESULTS = 3000
-MAX_TARGET_COUNT = 1000
-TEXT_SEARCH_PAGE_LIMIT = 60
+DEFAULT_SAFETY_MAX_RAW_RESULTS = 3000
+DEFAULT_MAX_TARGET_COUNT = 1000
+DEFAULT_TEXT_SEARCH_PAGE_LIMIT = 60
 
 
 def start_search_job(
@@ -44,7 +44,10 @@ def start_search_job(
     target_count: int = 1000,
 ) -> SearchJob:
     del radius
-    bounded_target = max(1, min(target_count, MAX_TARGET_COUNT))
+    max_target_count = int(
+        app.config.get("SEARCH_MAX_TARGET_COUNT", DEFAULT_MAX_TARGET_COUNT)
+    )
+    bounded_target = max(1, min(target_count, max_target_count))
     job = SearchJob(
         keyword=keyword,
         cities=", ".join(cities),
@@ -82,6 +85,12 @@ def _run_search_job(app: Flask, job_id: int, keyword: str, cities: list[str]) ->
         job.message = f"{source_name} Suche läuft"
         _append_job_event(job, phase="start", message=job.message)
 
+        max_raw_results = int(
+            app.config.get("SEARCH_MAX_RAW_RESULTS", DEFAULT_SAFETY_MAX_RAW_RESULTS)
+        )
+        text_page_limit = int(
+            app.config.get("SEARCH_TEXT_PAGE_LIMIT", DEFAULT_TEXT_SEARCH_PAGE_LIMIT)
+        )
         for city in cities:
             if job.total_created >= job.target_count:
                 break
@@ -92,12 +101,12 @@ def _run_search_job(app: Flask, job_id: int, keyword: str, cities: list[str]) ->
             _append_job_event(job, phase="city_start", message=job.message)
 
             remaining = max(0, job.target_count - job.total_created)
-            raw_limit = min(max(remaining * 4, 80), SAFETY_MAX_RAW_RESULTS)
+            raw_limit = min(max(remaining * 4, 80), max_raw_results)
             try:
                 batch = client.text_search_paginated(
                     query,
                     max_results=raw_limit,
-                    safety_page_limit=TEXT_SEARCH_PAGE_LIMIT,
+                    safety_page_limit=text_page_limit,
                 )
             except GooglePlacesError as exc:
                 job.errors += 1
@@ -203,7 +212,7 @@ def _mark_job_failed(job: SearchJob, reason: str) -> None:
 
 def _job_counters(job: SearchJob) -> dict[str, int]:
     return {
-        "target": min(job.target_count or 0, MAX_TARGET_COUNT),
+        "target": min(job.target_count or 0, DEFAULT_MAX_TARGET_COUNT),
         "raw_found": job.total_found_raw,
         "processed": job.total_processed,
         "new_leads": job.total_created,
@@ -246,9 +255,13 @@ def _create_places_client(app: Flask) -> tuple[Any | None, str, str | None]:
     api_key = (app.config.get("GOOGLE_MAPS_API_KEY") or "").strip()
     if not api_key:
         return None, "google_places", "GOOGLE_MAPS_API_KEY fehlt"
-    timeout = float(app.config["REQUEST_TIMEOUT"])
+    policy = app.config["EXTERNAL_SERVICE_POLICIES"]["google_places"]
     return (
-        GooglePlacesClient(api_key, timeout=max(1.0, timeout)),
+        GooglePlacesClient(
+            api_key,
+            timeout=policy.timeout,
+            min_interval_seconds=policy.min_interval_seconds,
+        ),
         provider,
         None,
     )

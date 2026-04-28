@@ -7,7 +7,7 @@ class SearchForm(FlaskForm):
     keyword = StringField("Suchbegriff", validators=[DataRequired(), Length(max=120)])
     cities = StringField("Städte", validators=[DataRequired(), Length(max=500)])
     target_count = IntegerField(
-        "Zielanzahl", default=1000, validators=[NumberRange(min=1, max=1000)]
+        "Zielanzahl", default=1000, validators=[NumberRange(min=1)]
     )
     submit = SubmitField("Suche starten")
 

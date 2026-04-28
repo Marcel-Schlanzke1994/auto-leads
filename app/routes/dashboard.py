@@ -23,13 +23,19 @@ dashboard_bp = Blueprint("dashboard", __name__)
 @dashboard_bp.route("/dashboard", methods=["GET", "POST"])
 def dashboard() -> str:
     form = SearchForm()
+    default_cities = ", ".join(current_app.config.get("SEARCH_DEFAULT_CITIES", []))
+    max_target = int(current_app.config.get("SEARCH_MAX_TARGET_COUNT", 1000))
+    if request.method == "GET" and not form.cities.data:
+        form.cities.data = default_cities
+    if request.method == "GET" and not form.target_count.data:
+        form.target_count.data = max_target
     if form.validate_on_submit():
         cities = [city.strip() for city in form.cities.data.split(",") if city.strip()]
         job = start_search_job(
             current_app._get_current_object(),
             keyword=form.keyword.data.strip(),
             cities=cities,
-            target_count=form.target_count.data or 1000,
+            target_count=form.target_count.data or max_target,
         )
         flash(f"Suchjob #{job.id} gestartet", "success")
         return redirect(url_for("dashboard.dashboard"))
@@ -54,6 +60,8 @@ def dashboard() -> str:
     return render_template(
         "dashboard.html",
         form=form,
+        max_target=max_target,
+        default_cities=default_cities,
         stats=stats,
         latest_job=latest_job,
         leads=leads[:10],
