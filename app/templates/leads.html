@@ -3,14 +3,85 @@
 {% block content %}
 <section class="panel">
   <h2>Leadliste</h2>
-  <form method="get" class="split">
-    <input id="lead-filter" name="q" type="search" value="{{ query }}" placeholder="Nach Firma suchen..." />
-    <button class="btn" type="submit">Filtern</button>
+  <form method="get" class="form-grid">
+    <div class="split">
+      <label>Suche
+        <input name="q" type="search" value="{{ filters.q }}" placeholder="Firma, Adresse, Website..." />
+      </label>
+      <label>Stadt
+        <input name="city" type="text" value="{{ filters.city }}" placeholder="z. B. Köln" />
+      </label>
+      <label>Status
+        <select name="status">
+          <option value="">Alle</option>
+          {% for current in statuses %}
+          <option value="{{ current }}" {% if filters.status == current %}selected{% endif %}>{{ current }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Sortierung
+        <select name="sort">
+          <option value="lead_potential" {% if filters.sort == 'lead_potential' %}selected{% endif %}>Lead Potential</option>
+          <option value="reviews" {% if filters.sort == 'reviews' %}selected{% endif %}>Reviews</option>
+          <option value="rating" {% if filters.sort == 'rating' %}selected{% endif %}>Rating</option>
+          <option value="seo_score" {% if filters.sort == 'seo_score' %}selected{% endif %}>SEO-Score</option>
+          <option value="date" {% if filters.sort == 'date' %}selected{% endif %}>Datum</option>
+        </select>
+      </label>
+    </div>
+
+    <div class="split">
+      <label>Fehlende Kontaktdaten
+        <select name="contact">
+          <option value="">Kein Filter</option>
+          <option value="website_missing" {% if filters.contact == 'website_missing' %}selected{% endif %}>Website fehlt</option>
+          <option value="email_missing" {% if filters.contact == 'email_missing' %}selected{% endif %}>E-Mail fehlt</option>
+          <option value="phone_missing" {% if filters.contact == 'phone_missing' %}selected{% endif %}>Telefon fehlt</option>
+        </select>
+      </label>
+      <fieldset>
+        <legend>Score-Ranges</legend>
+        <div class="check-grid">
+          {% for range_key, labels in score_ranges.items() %}
+          <label>
+            <input type="checkbox" name="score_range" value="{{ range_key }}" {% if range_key in filters.score_ranges %}checked{% endif %} /> {{ range_key }}
+          </label>
+          {% endfor %}
+        </div>
+      </fieldset>
+    </div>
+
+    <div class="check-grid">
+      <label><input type="checkbox" name="review_lt_30" value="1" {% if filters.review_lt_30 %}checked{% endif %} /> Review &lt; 30</label>
+      <label><input type="checkbox" name="rating_missing" value="1" {% if filters.rating_missing %}checked{% endif %} /> Rating fehlt</label>
+      <label><input type="checkbox" name="impressum_missing" value="1" {% if filters.impressum_missing %}checked{% endif %} /> Impressum fehlt</label>
+      <label><input type="checkbox" name="localbusiness_missing" value="1" {% if filters.localbusiness_missing %}checked{% endif %} /> LocalBusiness Schema fehlt</label>
+    </div>
+
+    <div class="toolbar">
+      <button class="btn" type="submit">Filter anwenden</button>
+      <div class="split">
+        <a class="btn" href="{{ url_for('export.export_csv') }}">CSV: alle Leads</a>
+        <a class="btn" href="{{ url_for('export.export_csv_high_potential') }}?min_score=70">CSV: High Potential</a>
+        <a class="btn" href="{{ url_for('export.export_csv_filtered', **request.args) }}">CSV: aktuelle Filter</a>
+      </div>
+    </div>
   </form>
+
   <div class="table-wrap">
     <table id="lead-table">
       <thead>
-        <tr><th>Firma</th><th>Stadt</th><th>Website</th><th>E-Mail</th><th>Telefon</th><th>Score</th><th>Status</th></tr>
+        <tr>
+          <th>Firma</th>
+          <th>Stadt</th>
+          <th>Website</th>
+          <th>E-Mail</th>
+          <th>Telefon</th>
+          <th>Reviews</th>
+          <th>Rating</th>
+          <th>Score</th>
+          <th>Status</th>
+        </tr>
       </thead>
       <tbody>
         {% for lead in leads %}
@@ -20,11 +91,13 @@
           <td>{% if lead.website %}<a href="{{ lead.website }}" target="_blank" rel="noopener noreferrer">{{ lead.website }}</a>{% else %}-{% endif %}</td>
           <td>{{ lead.email or '-' }}</td>
           <td>{{ lead.phone or '-' }}</td>
+          <td>{{ lead.review_count or '-' }}</td>
+          <td>{{ lead.google_rating or '-' }}</td>
           <td>{{ lead.score }}</td>
           <td><span class="pill {{ lead.status }}">{{ lead.status }}</span></td>
         </tr>
         {% else %}
-        <tr><td colspan="7">Keine Leads vorhanden.</td></tr>
+        <tr><td colspan="9">Keine Leads für diese Filter gefunden.</td></tr>
         {% endfor %}
       </tbody>
     </table>
