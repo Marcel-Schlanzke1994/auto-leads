@@ -4,6 +4,8 @@ Ein lokales Browser-Tool für Lead-Generierung und Lead-Management mit offiziell
 
 ## Features
 
+- Optionale Playwright Browser-Analyse (default: deaktiviert), siehe `docs/PLAYWRIGHT_BROWSER_ANALYSIS.md`.
+
 - Konfiguration vollständig über `.env` (`python-dotenv`)
 - Google Places Text Search + Place Details (offizielle API)
 - Pagination/iterative Folgeabfragen für große Suchläufe
@@ -162,3 +164,33 @@ Für einen einheitlichen Ablauf zwischen Entwicklern und Agenten gelten folgende
 - Operativer Master-Plan: `docs/execplans/auto-lead-system-execplan.md`.
 
 Änderungen sollten immer entlang des ExecPlans geplant und in den oben genannten Dateien konsistent dokumentiert werden.
+
+
+## Sichere E-Mail-Provider (Phase 8)
+
+- Default: `EMAIL_PROVIDER=debug` (nur Preview, kein echter Versand).
+- Optional: Cloudflare Email Provider nur mit explizitem Feature-Flag + Secrets.
+- Kein Bulk-Send, kein Auto-Send.
+- Details: `docs/EMAIL_SENDING_POLICY.md`.
+
+## Optional Cloudflare Worker Foundation
+
+Die Cloudflare-Schicht ist aktuell eine **optionale Vorbereitung** und hat keinen Einfluss auf das lokale Flask-System.
+
+Details: `docs/CLOUDFLARE_FOUNDATION.md`
+
+Optionaler Wrangler-Dev-Flow (ohne Deployment): `cloudflare/README.md` und `docs/WRANGLER_SETUP.md`.
+
+Sandbox-/SSRF-Leitplanken für externe Website-Analysen: `docs/SANDBOX_POLICY.md`
+
+```bash
+cd cloudflare
+npm install
+npm run dev
+npm run typecheck
+```
+
+
+
+## Web Perf Audit Erweiterung
+Die Audit-Engine enthält eine additive Web-Performance-Auswertung. Details: `docs/WEB_PERF_AUDIT.md`. Optional kann `PAGESPEED_API_KEY` für erweiterte CWV-nahe Felder gesetzt werden.

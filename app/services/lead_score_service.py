@@ -161,6 +161,15 @@ def _build_rule_results(lead: Lead) -> list[ScoreRuleResult]:
     ]
 
 
+def _latest_web_perf(lead: Lead) -> dict:
+    if not lead.audit_results:
+        return {}
+    latest = max(lead.audit_results, key=lambda item: item.created_at)
+    if latest.raw_pagespeed_json and isinstance(latest.raw_pagespeed_json, dict):
+        return latest.raw_pagespeed_json.get("web_perf") or {}
+    return {}
+
+
 def _subscore(rule_results: list[ScoreRuleResult], dimension: str) -> int:
     dimension_rules = [rule for rule in rule_results if rule.dimension == dimension]
     if not dimension_rules:
@@ -172,6 +181,63 @@ def _subscore(rule_results: list[ScoreRuleResult], dimension: str) -> int:
 
 def calculate_lead_score_details(lead: Lead) -> dict[str, Any]:
     rules = _build_rule_results(lead)
+    web_perf = _latest_web_perf(lead)
+    perf_score = web_perf.get("performance_score")
+    if isinstance(perf_score, (int, float)) and perf_score < 50:
+        rules.append(
+            ScoreRuleResult(
+                "WEB_PERF_SCORE_LOW",
+                "technical",
+                15,
+                15,
+                f"performance_score={perf_score}",
+                True,
+            )
+        )
+    if web_perf.get("uses_compression") is False:
+        rules.append(
+            ScoreRuleResult(
+                "WEB_PERF_COMPRESSION_MISSING",
+                "technical",
+                5,
+                5,
+                "uses_compression=false",
+                True,
+            )
+        )
+    if web_perf.get("render_blocking_risk") == "high":
+        rules.append(
+            ScoreRuleResult(
+                "WEB_PERF_RENDER_BLOCKING_HIGH",
+                "technical",
+                8,
+                8,
+                "render_blocking_risk=high",
+                True,
+            )
+        )
+    if web_perf.get("image_optimization_risk") == "high":
+        rules.append(
+            ScoreRuleResult(
+                "WEB_PERF_IMAGE_RISK_HIGH",
+                "technical",
+                8,
+                8,
+                "image_optimization_risk=high",
+                True,
+            )
+        )
+    if web_perf.get("mobile_performance_risk") == "high":
+        rules.append(
+            ScoreRuleResult(
+                "WEB_PERF_MOBILE_RISK_HIGH",
+                "technical",
+                5,
+                5,
+                "mobile_performance_risk=high",
+                True,
+            )
+        )
     dimensions = [
         "reputation",
         "website_presence",

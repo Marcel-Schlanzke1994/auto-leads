@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import os
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from urllib.parse import urlparse
 
 import requests
 from flask import current_app, has_app_context
 
+from app.services.sandbox import PrivateNetworkBlockedError, validate_external_url
 from app.utils import is_private_hostname
 
 
@@ -31,6 +32,7 @@ class FetchResult:
     page_load_ms: int
     redirect_history: list[RedirectHop]
     used_https: bool
+    response_headers: dict[str, str] = field(default_factory=dict)
 
 
 class WebsiteFetchSecurityError(ValueError):
@@ -44,12 +46,11 @@ def normalize_url(url: str) -> str:
     parsed = urlparse(value)
     if not parsed.scheme:
         value = f"https://{value.lstrip('/')}"
-        parsed = urlparse(value)
-    if not parsed.hostname:
-        raise ValueError("Ungültige URL")
-    if is_private_hostname(parsed.hostname):
-        raise WebsiteFetchSecurityError("Private/local targets are blocked")
-    return value
+    try:
+        validated = validate_external_url(value)
+    except PrivateNetworkBlockedError as exc:
+        raise WebsiteFetchSecurityError("Private/local targets are blocked") from exc
+    return validated.normalized_url
 
 
 def _ensure_public_response_chain(response: requests.Response) -> None:
@@ -129,4 +130,7 @@ def fetch_website(
         page_load_ms=int((time.perf_counter() - started) * 1000),
         redirect_history=redirect_history,
         used_https=used_https,
+        response_headers={
+            k.lower(): v for k, v in (getattr(response, "headers", {}) or {}).items()
+        },
     )

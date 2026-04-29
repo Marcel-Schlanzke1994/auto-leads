@@ -66,3 +66,7 @@ Ausnahme: ausschließlich Dokumentations-/Kommentaränderungen.
 - Für Security/API/Crawling/DB/CI-relevante Änderungen ist das Multi-Agent-Gate (`docs/MULTI_AGENT_GATE.md`) verpflichtend.
 - Reviewer- und Security-Rollen sind bevorzugt `read-only` einzusetzen; schreibende Eingriffe nur mit Begründung.
 - Evidence ist Pflicht, nicht optional: Ohne belastbare Nachweise zu Checks, Risiken und Mitigations ist kein Merge zulässig.
+
+## Skill-Routing-Ergänzung (Cloudflare-Vendoring)
+- Cloudflare-Referenz-Skills liegen unter `.agents/skills/cloudflare/` und sind bei Aufgaben zu Worker/Perf/Sandbox/Email als primäre Referenz zu nutzen.
+- Die Skill-Dateien sind dokumentarische Leitplanken und ersetzen keinen produktiven Flask-App-Code.

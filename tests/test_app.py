@@ -236,6 +236,40 @@ def test_create_contact_form_draft_route_creates_draft(client, app):
         assert drafts[0].meta_json["auto_send"] is False
 
 
+def test_analyze_contact_form_route_persists_result(client, app, monkeypatch):
+    with app.app_context():
+        lead = Lead(
+            company_name="Analyse GmbH",
+            source_query="x",
+            website="https://analyse.example",
+        )
+        db.session.add(lead)
+        db.session.commit()
+        lead_id = lead.id
+
+    class StubResult:
+        status = "skipped"
+        contact_page_url = None
+        forms_found = []
+        fields = []
+        recommendations = []
+        errors = []
+        metadata = {"reason": "disabled"}
+
+    monkeypatch.setattr(
+        "app.routes.leads.analyze_contact_forms", lambda *_: StubResult()
+    )
+    response = client.post(f"/leads/{lead_id}/analyze-contact-form")
+    assert response.status_code == 302
+
+    with app.app_context():
+        refreshed = db.session.get(Lead, lead_id)
+        assert refreshed is not None
+        stored = refreshed.raw_place_json["playwright_contact_form_analysis"]
+        assert stored["status"] == "skipped"
+        assert stored["metadata"]["reason"] == "disabled"
+
+
 def test_create_draft_route_includes_latest_audit_hints(client, app):
     with app.app_context():
         lead = Lead(

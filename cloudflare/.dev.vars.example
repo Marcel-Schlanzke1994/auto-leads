@@ -1,0 +1,6 @@
+# Local-only example vars for wrangler dev.
+# Copy to .dev.vars and adjust non-secret values for local testing only.
+# If secrets are needed later, set them via `wrangler secret put` (do not store here).
+VERSION=local-dev
+AUTO_LEADS_ENV=development
+LOG_LEVEL=info

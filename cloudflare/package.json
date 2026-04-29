@@ -1,0 +1,17 @@
+{
+  "name": "auto-leads-cloudflare-foundation",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Optional Cloudflare Worker foundation for auto-leads.",
+  "scripts": {
+    "dev": "wrangler dev --config wrangler.example.toml",
+    "typecheck": "tsc --noEmit",
+    "check": "npm run typecheck",
+    "dry-run": "wrangler deploy --dry-run --config wrangler.example.toml"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.0",
+    "wrangler": "^4.14.0",
+    "@cloudflare/workers-types": "^4.20260415.0"
+  }
+}

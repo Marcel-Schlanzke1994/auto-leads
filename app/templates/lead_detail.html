@@ -31,6 +31,10 @@
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
     <button class="btn" type="submit">Audit erneut starten</button>
   </form>
+  <form method="post" action="{{ url_for('leads.analyze_contact_form', lead_id=lead.id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+    <button class="btn" type="submit">Kontaktformular analysieren</button>
+  </form>
 </section>
 
 <section class="panel">
@@ -153,6 +157,20 @@
 </section>
 
 <section class="panel">
+  <h3>Playwright Kontaktformular-Analyse</h3>
+  {% if playwright_analysis %}
+  <p><strong>Status:</strong> {{ playwright_analysis.status or '-' }}</p>
+  <p><strong>Kontaktseite:</strong> {{ playwright_analysis.contact_page_url or '-' }}</p>
+  <p><strong>Formulare:</strong> {{ playwright_analysis.forms_found or 0 }} | <strong>Felder:</strong> {{ playwright_analysis.fields_found or 0 }}</p>
+  {% if playwright_analysis.errors %}
+  <ul>{% for err in playwright_analysis.errors %}<li>{{ err }}</li>{% endfor %}</ul>
+  {% endif %}
+  {% else %}
+  <p>Noch keine Playwright-Analyse gespeichert.</p>
+  {% endif %}
+</section>
+
+<section class="panel">
   <h3>Erkannte Kontaktseiten / Formular-URLs</h3>
   <ul>
     {% for url in lead.contact_form_urls or [] %}
@@ -177,6 +195,21 @@
   </p>
   {% else %}
   <p>Noch kein detailliertes Audit vorhanden.</p>
+  {% endif %}
+</section>
+
+<section class="panel">
+  <h3>Web Performance</h3>
+  {% set web_perf = (latest_audit.raw_pagespeed_json.web_perf if latest_audit and latest_audit.raw_pagespeed_json and latest_audit.raw_pagespeed_json.web_perf else None) %}
+  {% if web_perf %}
+  <p><strong>Score:</strong> {{ web_perf.performance_score or '-' }} | <strong>Quelle:</strong> {{ web_perf.source }}</p>
+  <p><strong>Metriken:</strong> LCP {{ web_perf.lcp_ms or '-' }} ms, CLS {{ web_perf.cls or '-' }}, INP {{ web_perf.inp_ms or '-' }} ms, TBT {{ web_perf.tbt_ms or '-' }} ms, FCP {{ web_perf.fcp_ms or '-' }} ms</p>
+  <p><strong>Risiken:</strong> Render Blocking {{ web_perf.render_blocking_risk }}, Bilder {{ web_perf.image_optimization_risk }}, Mobile {{ web_perf.mobile_performance_risk }}</p>
+  <ul>
+    {% for item in web_perf.recommendations or [] %}<li>{{ item }}</li>{% else %}<li>Keine Empfehlungen vorhanden.</li>{% endfor %}
+  </ul>
+  {% else %}
+  <p>Keine Web-Performance-Daten vorhanden.</p>
   {% endif %}
 </section>
 
