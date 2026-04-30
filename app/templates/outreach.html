@@ -91,6 +91,10 @@
             <a href="{{ url_for('leads.lead_detail', lead_id=draft.lead_id) }}">
               {{ draft.lead.company_name }}
             </a>
+            {% if draft.channel == 'email' %}
+            <br>
+            <small><a href="{{ url_for('leads.lead_detail', lead_id=draft.lead_id) }}">Im Lead öffnen &amp; senden</a></small>
+            {% endif %}
           </td>
 
           <td>{{ draft.channel or '-' }}</td>

@@ -40,6 +40,7 @@ from app.services.outreach_draft_service import (
     generate_outreach_draft,
 )
 from app.services.duplicate_service import normalize_company_name
+from app.services.email_service import send_outreach_email
 from app.services.website_audit_service import audit_website, persist_audit_result
 from app.extensions import db, limiter
 from app.forms import OUTREACH_STATUS_LABELS, StatusForm
@@ -716,6 +717,72 @@ def update_draft_status(lead_id: int, draft_id: int):
         draft.sent_at = now
     db.session.commit()
     flash("Draft-Status aktualisiert", "success")
+    return redirect(url_for("leads.lead_detail", lead_id=lead.id))
+
+
+@leads_bp.post("/<int:lead_id>/drafts/<int:draft_id>/send")
+@limiter.limit("20/hour")
+def send_draft_email(lead_id: int, draft_id: int):
+    lead = db.session.get(Lead, lead_id)
+    if not lead:
+        flash("Lead nicht gefunden", "error")
+        return redirect(url_for("leads.leads_list"))
+
+    draft = db.session.get(OutreachDraft, draft_id)
+    if not draft or draft.lead_id != lead.id:
+        flash("Draft nicht gefunden", "error")
+        return redirect(url_for("leads.lead_detail", lead_id=lead.id))
+
+    if not (lead.email or "").strip():
+        flash("Lead hat keine E-Mail-Adresse.", "error")
+        return redirect(url_for("leads.lead_detail", lead_id=lead.id))
+
+    if not (draft.body or "").strip():
+        flash("Draft enthält keinen E-Mail-Text.", "error")
+        return redirect(url_for("leads.lead_detail", lead_id=lead.id))
+
+    if (draft.channel or "").strip().lower() != "email":
+        flash("Nur E-Mail-Drafts können versendet werden.", "error")
+        return redirect(url_for("leads.lead_detail", lead_id=lead.id))
+
+    subject = draft.subject or f"Kurzer Hinweis für {lead.company_name}"
+    result = send_outreach_email(recipient=lead.email, subject=subject, body=draft.body)
+
+    if result.status in {"debug", "sent"}:
+        try:
+            now = datetime.now(UTC)
+            attempt_status = "debug" if result.provider == "debug" else "sent"
+            attempt = ContactAttempt(
+                lead_id=lead.id,
+                channel="email",
+                status=attempt_status,
+                direction="outbound",
+                subject=subject,
+                message=draft.body,
+                recipient=lead.email,
+                attempted_at=now,
+                notes=f"Sent via EMAIL_PROVIDER={result.provider}",
+            )
+            db.session.add(attempt)
+            draft.status = "used"
+            draft.sent_at = now
+            lead.status = "contacted"
+            db.session.commit()
+            if result.provider == "debug":
+                flash("Debug-E-Mail vorbereitet, nicht real gesendet.", "success")
+            else:
+                flash("E-Mail gesendet.", "success")
+        except Exception as exc:  # noqa: BLE001
+            db.session.rollback()
+            flash(f"E-Mail konnte nicht gespeichert werden: {exc}", "error")
+    else:
+        db.session.rollback()
+        flash(
+            "E-Mail-Versand fehlgeschlagen: "
+            f"{result.error_message or 'Unbekannter Fehler'}",
+            "error",
+        )
+
     return redirect(url_for("leads.lead_detail", lead_id=lead.id))
 
 

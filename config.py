@@ -12,6 +12,13 @@ def _as_float(name: str, default: float) -> float:
     return float(os.getenv(name, str(default)))
 
 
+def _as_bool(name: str, default: bool) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
 @dataclass(frozen=True, slots=True)
 class ServicePolicy:
     timeout: float
@@ -52,6 +59,16 @@ class Config:
     PLACES_PROVIDER = os.getenv("PLACES_PROVIDER", "google_places").lower().strip()
     GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY", "").strip()
     PAGESPEED_API_KEY = os.getenv("PAGESPEED_API_KEY", "").strip()
+
+    EMAIL_PROVIDER = os.getenv("EMAIL_PROVIDER", "debug").lower().strip()
+    EMAIL_FROM = os.getenv("EMAIL_FROM", "").strip()
+    EMAIL_REPLY_TO = os.getenv("EMAIL_REPLY_TO", "").strip()
+    SMTP_HOST = os.getenv("SMTP_HOST", "").strip()
+    SMTP_PORT = _as_int("SMTP_PORT", 587)
+    SMTP_USERNAME = os.getenv("SMTP_USERNAME", "").strip()
+    SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "").strip()
+    SMTP_USE_TLS = _as_bool("SMTP_USE_TLS", True)
+    SMTP_USE_SSL = _as_bool("SMTP_USE_SSL", False)
 
     GOOGLE_PLACES_TIMEOUT = _as_float("GOOGLE_PLACES_TIMEOUT", REQUEST_TIMEOUT)
     GOOGLE_PLACES_MIN_INTERVAL_SECONDS = _as_float(
