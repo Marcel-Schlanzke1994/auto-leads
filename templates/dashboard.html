@@ -3,6 +3,7 @@
 {% block content %}
 <section class="cards">
   <article class="card"><h3>Leads gesamt</h3><p>{{ stats.total }}</p></article>
+  <article class="card"><h3>Textvorlagen</h3><p>{{ stats.outreach_drafts }}</p></article>
   <article class="card"><h3>Neue Leads</h3><p>{{ stats.new }}</p></article>
   <article class="card"><h3>High Score (>=70)</h3><p>{{ stats.high_score }}</p></article>
   <article class="card"><h3>Mit Website</h3><p>{{ stats.with_website }}</p></article>
@@ -31,6 +32,46 @@
   </small>
 </section>
 {% endif %}
+
+<section class="panel">
+  <h2>Generierte Textvorlagen</h2>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Firma</th>
+          <th>Kanal</th>
+          <th>Vorlage</th>
+          <th>Betreff</th>
+          <th>Status</th>
+          <th>Text-Vorschau</th>
+          <th>Erstellt</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for draft in latest_outreach_drafts %}
+        <tr>
+          <td>
+            {% if draft.lead %}
+            <a href="{{ url_for('web.lead_detail', lead_id=draft.lead.id) }}">{{ draft.lead.company_name or ('Lead #' ~ draft.lead.id) }}</a>
+            {% else %}
+            -
+            {% endif %}
+          </td>
+          <td>{{ draft.channel }}</td>
+          <td>{{ draft.template_key or '-' }}</td>
+          <td>{{ draft.subject or '-' }}</td>
+          <td><span class="pill {{ draft.status }}">{{ draft.status }}</span></td>
+          <td>{{ (draft.body or '-')[:140] }}{% if draft.body and draft.body|length > 140 %}…{% endif %}</td>
+          <td>{{ draft.created_at.strftime('%Y-%m-%d %H:%M') if draft.created_at else '-' }}</td>
+        </tr>
+      {% else %}
+        <tr><td colspan="7">Noch keine Textvorlagen generiert.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
 
 <section class="panel">
   <div class="toolbar">
