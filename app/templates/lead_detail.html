@@ -66,8 +66,22 @@
   <ul>
     {% for draft in lead.outreach_drafts %}
     <li>
-      {{ draft.created_at }} | {{ draft.channel }} | {{ draft.subject or '-' }} | {{ draft.status }}
+      {{ draft.created_at }} | {{ draft.channel }} | Betreff: {{ draft.subject or '-' }} | {{ draft.status }}
+      <details>
+        <summary>Text anzeigen</summary>
+        <pre>{{ draft.body or '-' }}</pre>
+      </details>
       {% if draft.personalization_notes %}<br><small>Notizen: {{ draft.personalization_notes }}</small>{% endif %}
+      {% if draft.channel == 'email' %}
+        {% if lead.email %}
+        <form method="post" action="{{ url_for('leads.send_draft_email', lead_id=lead.id, draft_id=draft.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+          <button class="btn" type="submit">E-Mail senden</button>
+        </form>
+        {% else %}
+        <small>Keine E-Mail beim Lead vorhanden.</small>
+        {% endif %}
+      {% endif %}
       <form method="post" action="{{ url_for('leads.update_draft_status', lead_id=lead.id, draft_id=draft.id) }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
         <select name="status">
