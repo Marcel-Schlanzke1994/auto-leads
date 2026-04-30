@@ -10,10 +10,10 @@ from flask import (
     url_for,
 )
 
-from app.models import Lead, SearchJob
+from app.models import Lead, OutreachDraft, SearchJob
 from app.services.search_runner_service import start_search_job
 from app.forms import SearchForm
-from app.extensions import limiter
+from app.extensions import db, limiter
 
 
 dashboard_bp = Blueprint("dashboard", __name__)
@@ -44,8 +44,15 @@ def dashboard() -> str:
         flash("Bitte Eingaben prüfen.", "error")
 
     leads = Lead.query.order_by(Lead.score.desc(), Lead.created_at.desc()).all()
+    latest_outreach_drafts = (
+        OutreachDraft.query.options(db.joinedload(OutreachDraft.lead))
+        .order_by(OutreachDraft.created_at.desc())
+        .limit(20)
+        .all()
+    )
     stats = {
         "total": len(leads),
+        "outreach_drafts": OutreachDraft.query.count(),
         "new": sum(1 for lead_item in leads if lead_item.status == "new"),
         "high_score": sum(1 for lead_item in leads if lead_item.score >= 70),
         "with_website": sum(1 for lead_item in leads if lead_item.website),
@@ -64,6 +71,7 @@ def dashboard() -> str:
         default_cities=default_cities,
         stats=stats,
         latest_job=latest_job,
+        latest_outreach_drafts=latest_outreach_drafts,
         leads=leads[:10],
     )
 
