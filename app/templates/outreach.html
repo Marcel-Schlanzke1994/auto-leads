@@ -67,22 +67,61 @@
 
 <section class="panel">
   <h3>Drafts zur Prüfung</h3>
+
   <div class="table-wrap">
     <table>
       <thead>
-        <tr><th>Erstellt</th><th>Lead</th><th>Kanal</th><th>Betreff</th><th>Status</th></tr>
+        <tr>
+          <th>Erstellt</th>
+          <th>Lead</th>
+          <th>Kanal</th>
+          <th>Vorlage</th>
+          <th>Betreff</th>
+          <th>Textvorlage</th>
+          <th>Status</th>
+        </tr>
       </thead>
+
       <tbody>
         {% for draft in drafts_for_review %}
         <tr>
           <td>{{ draft.created_at.strftime('%Y-%m-%d %H:%M') if draft.created_at else '-' }}</td>
-          <td><a href="{{ url_for('leads.lead_detail', lead_id=draft.lead_id) }}">{{ draft.lead.company_name }}</a></td>
-          <td>{{ draft.channel }}</td>
+
+          <td>
+            <a href="{{ url_for('leads.lead_detail', lead_id=draft.lead_id) }}">
+              {{ draft.lead.company_name }}
+            </a>
+          </td>
+
+          <td>{{ draft.channel or '-' }}</td>
+
+          <td>{{ draft.template_key or '-' }}</td>
+
           <td>{{ draft.subject or '-' }}</td>
-          <td><span class="pill">{{ draft.status }}</span></td>
+
+          <td style="max-width: 520px;">
+            <details>
+              <summary>
+                Text anzeigen
+                {% if draft.body %}
+                  · {{ draft.body|length }} Zeichen
+                {% endif %}
+              </summary>
+
+              <div style="white-space: pre-wrap; margin-top: 10px; padding: 12px; border: 1px solid rgba(255,255,255,.15); border-radius: 10px; background: rgba(0,0,0,.18);">
+                {{ draft.body or 'Kein Text vorhanden.' }}
+              </div>
+            </details>
+          </td>
+
+          <td>
+            <span class="pill {{ draft.status }}">{{ draft.status }}</span>
+          </td>
         </tr>
         {% else %}
-        <tr><td colspan="5">Keine Drafts zur Prüfung vorhanden.</td></tr>
+        <tr>
+          <td colspan="7">Keine Drafts zur Prüfung vorhanden.</td>
+        </tr>
         {% endfor %}
       </tbody>
     </table>
