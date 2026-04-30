@@ -92,7 +92,7 @@ def check_outreach_block(lead: Lead, channel: str) -> BlockCheckResult:
             )
 
     blacklist_query = Blacklist.query.filter(Blacklist.active.is_(True)).filter(
-        (Blacklist.expires_at.is_(None)) | (Blacklist.expires_at > datetime.now(UTC))
+        (Blacklist.expires_at.is_(None)) | (Blacklist.expires_at > datetime.now(UTC).replace(tzinfo=None))
     )
 
     if normalized_email:
@@ -234,6 +234,30 @@ def _build_channel_draft(
     return None, phone_script
 
 
+def _format_score_100(value: float | int | None) -> str | None:
+    if value is None:
+        return None
+
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        return None
+
+    # Manche Quellen liefern 0.87, andere bereits 87.
+    if 0 <= numeric <= 1:
+        numeric = numeric * 100
+
+    numeric = max(0, min(100, numeric))
+    return str(round(numeric))
+
+
+def _clean_issue_text(value: str | None) -> str | None:
+    text = (value or "").strip()
+    if not text:
+        return None
+    return text[:180]
+
+
 def _build_personalization(
     lead: Lead,
     audit_result: AuditResult | None,
@@ -242,77 +266,82 @@ def _build_personalization(
     if not audit_result and not audit_issues:
         return _fallback_personalization(lead)
 
-    trigger_hints: list[str] = []
-    context_hints: list[str] = []
-
-    if audit_result and audit_result.score_performance is not None:
-        context_hints.append(
-            "- Gesamt-Performance-Score bei ca. "
-            f"{round(audit_result.score_performance * 100)}/100"
-        )
-
-    if audit_result and audit_result.score_seo is not None:
-        context_hints.append(
-            f"- SEO-Score bei ca. {round(audit_result.score_seo * 100)}/100"
-        )
+    hints: list[str] = []
 
     if audit_result and audit_result.cwv_lcp_ms:
-        trigger_hints.append(
-            f"- Audit-Trigger Ladezeit: LCP liegt bei rund {audit_result.cwv_lcp_ms} ms"
+        lcp_ms = audit_result.cwv_lcp_ms
+        if lcp_ms >= 2500:
+            hints.append(
+                f"- Ladezeit: Der LCP liegt bei rund {lcp_ms} ms und sollte verbessert werden."
+            )
+        elif lcp_ms >= 1800:
+            hints.append(
+                f"- Ladezeit: Der LCP liegt bei rund {lcp_ms} ms und ist noch optimierbar."
+            )
+
+    if audit_result and not audit_result.seo_meta_description:
+        hints.append(
+            "- SEO-Basis: Die Meta Description fehlt oder ist nicht sauber erkennbar."
         )
 
-    if audit_result and audit_result.seo_meta_description in (None, ""):
-        trigger_hints.append(
-            "- Audit-Trigger Meta Description: fehlt oder ist unvollständig"
+    if audit_result and audit_result.seo_h1_count is not None:
+        if audit_result.seo_h1_count == 0:
+            hints.append("- SEO-Struktur: Es wurde keine H1-Überschrift erkannt.")
+        elif audit_result.seo_h1_count > 1:
+            hints.append(
+                f"- SEO-Struktur: Es wurden {audit_result.seo_h1_count} H1-Überschriften erkannt."
+            )
+
+    if audit_result and audit_result.trust_impressum_found is False:
+        hints.append(
+            "- Vertrauen/Rechtliches: Ein Impressum wurde im Audit nicht zuverlässig erkannt."
+        )
+
+    if audit_result and audit_result.trust_privacy_found is False:
+        hints.append(
+            "- Vertrauen/Rechtliches: Eine Datenschutzerklärung wurde im Audit nicht zuverlässig erkannt."
+        )
+
+    if audit_result and audit_result.trust_contact_found is False:
+        hints.append(
+            "- Kontakt/Conversion: Kontaktinformationen wurden nicht zuverlässig erkannt."
         )
 
     high_issues = [
-        issue for issue in audit_issues if issue.severity in {"high", "critical"}
+        issue
+        for issue in audit_issues
+        if issue.severity in {"high", "critical"}
     ]
-    conversion_keywords = ("cta", "call to action", "conversion")
-    local_seo_keywords = (
-        "local",
-        "local seo",
-        "bewertung",
-        "review",
-        "google business",
+
+    for issue in high_issues[:3]:
+        title = _clean_issue_text(issue.title)
+        if title and not any(title in existing for existing in hints):
+            hints.append(f"- Audit-Hinweis: {title}")
+
+    performance_score = (
+        _format_score_100(audit_result.score_performance)
+        if audit_result
+        else None
     )
+    seo_score = _format_score_100(audit_result.score_seo) if audit_result else None
 
-    for issue in high_issues:
-        normalized_title = (issue.title or "").lower()
-        if any(keyword in normalized_title for keyword in conversion_keywords):
-            trigger_hints.append(f"- Audit-Trigger CTA/Conversion: {issue.title}")
-            break
+    if performance_score:
+        hints.append(f"- Performance-Score: ca. {performance_score}/100")
 
-    for issue in high_issues:
-        normalized_title = (issue.title or "").lower()
-        if any(keyword in normalized_title for keyword in local_seo_keywords):
-            trigger_hints.append(
-                f"- Audit-Trigger Local-SEO-Bewertungen: {issue.title}"
-            )
-            break
+    if seo_score:
+        hints.append(f"- SEO-Score: ca. {seo_score}/100")
 
-    if high_issues and high_issues[0].title:
-        trigger_hints.append(f"- Audit-Trigger SEO-Issue: {high_issues[0].title}")
-
-    if len(trigger_hints) < 4:
-        existing_trigger_text = " ".join(trigger_hints).lower()
-        if "cta/conversion" not in existing_trigger_text:
-            trigger_hints.append(
-                "- Audit-Trigger CTA/Conversion: zentrale Handlungsaufforderung "
-                "und Kontaktpfad sind nicht klar genug"
-            )
-        if "local-seo-bewertungen" not in existing_trigger_text:
-            trigger_hints.append(
-                "- Audit-Trigger Local-SEO-Bewertungen: Bewertungspräsenz und "
-                "lokale Vertrauenssignale sind ausbaufähig"
-            )
-
-    hints = (trigger_hints[:4] + context_hints[:2])[:6]
+    # Keine erfundenen Probleme ergänzen.
+    # Wenn kaum belastbare Daten vorhanden sind, transparent bleiben.
     if not hints:
-        return _fallback_personalization(lead)
+        company = lead.company_name or "Ihr Unternehmen"
+        return (
+            f"- Für {company} liegen erste Audit-Daten vor, aber keine ausreichend "
+            "klaren Einzelprobleme für eine harte Aussage.\n"
+            "- Sinnvoll wäre eine kurze manuelle Priorisierung, bevor daraus ein Anschreiben entsteht."
+        )
 
-    return "\n".join(hints)
+    return "\n".join(hints[:6])
 
 
 def _fallback_personalization(lead: Lead) -> str:

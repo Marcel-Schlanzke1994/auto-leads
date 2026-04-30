@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Any
 
 from app.models import Lead
@@ -161,14 +162,29 @@ def _build_rule_results(lead: Lead) -> list[ScoreRuleResult]:
     ]
 
 
-def _latest_web_perf(lead: Lead) -> dict:
+def _as_aware_utc(value):
+    if value is None:
+        return datetime.min.replace(tzinfo=UTC)
+
+    if value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+
+    return value.astimezone(UTC)
+
+
+def _latest_web_perf(lead):
     if not lead.audit_results:
         return {}
-    latest = max(lead.audit_results, key=lambda item: item.created_at)
+
+    latest = max(
+        lead.audit_results,
+        key=lambda item: _as_aware_utc(item.created_at),
+    )
+
     if latest.raw_pagespeed_json and isinstance(latest.raw_pagespeed_json, dict):
         return latest.raw_pagespeed_json.get("web_perf") or {}
-    return {}
 
+    return {}
 
 def _subscore(rule_results: list[ScoreRuleResult], dimension: str) -> int:
     dimension_rules = [rule for rule in rule_results if rule.dimension == dimension]
